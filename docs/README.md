@@ -30,6 +30,7 @@ This documentation is split by concern so planning can grow without turning into
 3. [0001: Logging Library Selection](decisions/0001-logging-library.md)
 4. [0002: Rendering Baseline](decisions/0002-rendering-baseline.md)
 5. [0003: Initial Runtime Data Model Strategy](decisions/0003-data-model-strategy.md)
+6. [0004: Windowing and OpenGL Context Library](decisions/0004-windowing-and-context-library.md)
 
 ### Documentation
 1. [Documentation Contribution Guide](contributing-docs.md)

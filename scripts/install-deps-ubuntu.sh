@@ -47,13 +47,23 @@ PACKAGES=(
   shellcheck
 
   libgl1-mesa-dev
+  libglvnd-dev
   libglu1-mesa-dev
   mesa-common-dev
+
+  xorg-dev
   libx11-dev
+  libxext-dev
+  libxrender-dev
+  libxfixes-dev
+  libxxf86vm-dev
   libxrandr-dev
   libxinerama-dev
   libxcursor-dev
   libxi-dev
+
+  libwayland-dev
+  wayland-protocols
 )
 
 sudo apt-get install -y "${PACKAGES[@]}"

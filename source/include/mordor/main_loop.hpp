@@ -1,7 +1,7 @@
 #pragma once
 
-#include <functional>
 #include <cstdint>
+#include <functional>
 
 namespace mordor {
 
@@ -22,6 +22,7 @@ struct LoopCallbacks
 {
     std::function<void(double)> m_simulate;
     std::function<void(double)> m_render;
+    std::function<bool()>       m_should_continue;
 };
 
 LoopStats run_main_loop(const LoopConfig& config, const LoopCallbacks& callbacks);

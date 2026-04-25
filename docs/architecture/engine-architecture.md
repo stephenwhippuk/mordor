@@ -44,6 +44,11 @@ Responsibilities:
 3. Mesh/material loading and rendering.
 4. Debug rendering overlays for development.
 
+Current baseline:
+1. OpenGL 4.1 core profile context (decision 0002).
+2. GLFW-based window/context bootstrap (decision 0004).
+3. Temporary debug map draw path implemented as scissor-constrained clear regions until shader/VBO pipeline lands.
+
 Ordering note:
 1. Ship stable world rendering before advanced visual effects.
 

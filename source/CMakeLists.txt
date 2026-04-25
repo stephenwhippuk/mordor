@@ -10,6 +10,8 @@
 # Dependencies
 # ---------------------------------------------------------------------------
 include(FetchContent)
+find_package(OpenGL QUIET)
+find_package(X11 QUIET)
 
 # Logging — quill (decision: docs/decisions/0001-logging-library.md)
 # Engine code must not include quill headers directly; use mordor/log.hpp only.
@@ -24,6 +26,23 @@ FetchContent_Declare(quill
 set(QUILL_BUILD_TESTS    OFF CACHE BOOL "" FORCE)
 set(QUILL_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(quill)
+
+set(MORDOR_HAS_GLFW 0)
+if(X11_FOUND)
+    set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+    set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(GLFW_BUILD_WAYLAND OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(glfw
+        GIT_REPOSITORY https://github.com/glfw/glfw.git
+        GIT_TAG        3.4
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(glfw)
+    set(MORDOR_HAS_GLFW 1)
+else()
+    message(WARNING "X11 development packages not found; renderer window bootstrap will run in stub mode")
+endif()
 
 # Suppress warnings from quill's own headers — they shadow their own members
 # under -Wshadow. quill::quill is an ALIAS so we target the real target.
@@ -60,6 +79,19 @@ target_link_libraries(mordor
     PRIVATE
         quill::quill
 )
+
+if(MORDOR_HAS_GLFW)
+    target_link_libraries(mordor PRIVATE glfw)
+endif()
+
+if(OpenGL_FOUND AND MORDOR_HAS_GLFW)
+    target_link_libraries(mordor PRIVATE OpenGL::GL)
+    target_compile_definitions(mordor PRIVATE MORDOR_HAS_OPENGL=1)
+else()
+    message(WARNING "OpenGL or GLFW dependencies missing; renderer will build in stub mode")
+    target_compile_definitions(mordor PRIVATE MORDOR_HAS_OPENGL=0)
+endif()
+target_compile_definitions(mordor PRIVATE MORDOR_HAS_GLFW=${MORDOR_HAS_GLFW})
 
 # Expose the CMake build type as a compile-time string constant.
 target_compile_definitions(mordor
