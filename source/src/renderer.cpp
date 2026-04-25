@@ -37,8 +37,8 @@ bool Renderer::init(const RendererConfig& config)
 {
 #if !MORDOR_HAS_GLFW || !MORDOR_HAS_OPENGL
     (void)config;
-    MORDOR_LOG_ERROR("Renderer bootstrap unavailable: missing GLFW/OpenGL dependencies");
-    return false;
+    MORDOR_LOG_WARN("Renderer running in stub mode: GLFW/OpenGL dependencies not available");
+    return true;
 #else
     MORDOR_ASSERT_MSG(config.m_width > 0 && config.m_height > 0, "invalid window size");
 
@@ -114,7 +114,7 @@ bool Renderer::should_close() const
 #if MORDOR_HAS_GLFW
     return (m_window == nullptr) || (glfwWindowShouldClose(m_window) == GLFW_TRUE);
 #else
-    return true;
+    return false;
 #endif
 }
 
