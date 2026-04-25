@@ -22,6 +22,14 @@ struct DebugTile
     float m_height{10.0F};
 };
 
+struct CameraState
+{
+    float m_x{0.0F};
+    float m_y{0.0F};
+    float m_zoom{1.0F};
+    float m_rotation_radians{0.0F};
+};
+
 class Renderer
 {
 public:
@@ -35,6 +43,9 @@ public:
     void shutdown();
 
     bool should_close() const;
+    void update_camera_controls(double dt_seconds);
+    CameraState camera_state() const;
+
     void begin_frame();
     void draw_debug_map(const std::vector<DebugTile>& tiles);
     void end_frame();
@@ -44,6 +55,11 @@ private:
     bool m_glfw_initialized{false};
     int m_window_width{0};
     int m_window_height{0};
+
+    CameraState m_camera{};
+    float m_pan_speed{350.0F};
+    float m_zoom_speed{1.0F};
+    float m_rotation_speed{1.5F};
 };
 
 } // namespace mordor
