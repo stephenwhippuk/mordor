@@ -11,7 +11,6 @@
 # ---------------------------------------------------------------------------
 include(FetchContent)
 find_package(OpenGL QUIET)
-find_package(X11 QUIET)
 
 # Logging — quill (decision: docs/decisions/0001-logging-library.md)
 # Engine code must not include quill headers directly; use mordor/log.hpp only.
@@ -27,21 +26,45 @@ set(QUILL_BUILD_TESTS    OFF CACHE BOOL "" FORCE)
 set(QUILL_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(quill)
 
-set(MORDOR_HAS_GLFW 0)
-if(X11_FOUND)
-    set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
-    set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-    set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-    set(GLFW_BUILD_WAYLAND OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+
+# On Linux, GLFW requires at least one platform backend (X11 or Wayland).
+# Detect which are available and enable only those.  On Windows and macOS
+# GLFW selects the native backend automatically so we always fetch it.
+set(MORDOR_HAS_GLFW 1)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    find_package(X11 QUIET)
+    find_package(Wayland QUIET)
+    if(NOT X11_FOUND AND NOT Wayland_FOUND)
+        message(WARNING
+            "Neither X11 nor Wayland dev packages found on Linux; "
+            "renderer window bootstrap will run in stub mode")
+        set(MORDOR_HAS_GLFW 0)
+    else()
+        if(X11_FOUND)
+            message(STATUS "X11 dev packages found; enabling GLFW X11 backend")
+            set(GLFW_BUILD_X11 ON CACHE BOOL "" FORCE)
+        else()
+            set(GLFW_BUILD_X11 OFF CACHE BOOL "" FORCE)
+        endif()
+        if(Wayland_FOUND)
+            message(STATUS "Wayland dev packages found; enabling GLFW Wayland backend")
+            set(GLFW_BUILD_WAYLAND ON CACHE BOOL "" FORCE)
+        else()
+            set(GLFW_BUILD_WAYLAND OFF CACHE BOOL "" FORCE)
+        endif()
+    endif()
+endif()
+
+if(MORDOR_HAS_GLFW)
     FetchContent_Declare(glfw
         GIT_REPOSITORY https://github.com/glfw/glfw.git
         GIT_TAG        3.4
         GIT_SHALLOW    TRUE
     )
     FetchContent_MakeAvailable(glfw)
-    set(MORDOR_HAS_GLFW 1)
-else()
-    message(WARNING "X11 development packages not found; renderer window bootstrap will run in stub mode")
 endif()
 
 # Suppress warnings from quill's own headers — they shadow their own members
