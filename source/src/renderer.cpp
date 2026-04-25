@@ -232,11 +232,27 @@ void Renderer::draw_debug_map(const std::vector<DebugTile>& tiles)
         const float screen_cx = (static_cast<float>(m_window_width) * 0.5F) + rot_cx;
         const float screen_cy = (static_cast<float>(m_window_height) * 0.5F) + rot_cy;
 
-        const int w = static_cast<int>(tile.m_width * m_camera.m_zoom);
-        const int h = static_cast<int>(tile.m_height * m_camera.m_zoom);
-        const int x = static_cast<int>(screen_cx - static_cast<float>(w) * 0.5F);
-        const int y = static_cast<int>(screen_cy - static_cast<float>(h) * 0.5F);
+        const float scaled_w = tile.m_width * m_camera.m_zoom;
+        const float scaled_h = tile.m_height * m_camera.m_zoom;
 
+        if (scaled_w <= 0.0F || scaled_h <= 0.0F)
+        {
+            continue;
+        }
+
+        const float half_w = scaled_w * 0.5F;
+        const float half_h = scaled_h * 0.5F;
+        const float abs_c = std::abs(c);
+        const float abs_s = std::abs(s);
+        const float aabb_half_w = (abs_c * half_w) + (abs_s * half_h);
+        const float aabb_half_h = (abs_s * half_w) + (abs_c * half_h);
+
+        const int x = static_cast<int>(std::floor(screen_cx - aabb_half_w));
+        const int y = static_cast<int>(std::floor(screen_cy - aabb_half_h));
+        const int right = static_cast<int>(std::ceil(screen_cx + aabb_half_w));
+        const int top = static_cast<int>(std::ceil(screen_cy + aabb_half_h));
+        const int w = right - x;
+        const int h = top - y;
         if (w <= 0 || h <= 0)
         {
             continue;
