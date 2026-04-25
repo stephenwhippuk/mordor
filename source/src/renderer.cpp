@@ -8,7 +8,11 @@
 #endif
 
 #if MORDOR_HAS_OPENGL
+#if defined(__APPLE__)
+#include <OpenGL/gl3.h>
+#else
 #include <GL/gl.h>
+#endif
 #endif
 
 namespace mordor {
