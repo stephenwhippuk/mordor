@@ -12,6 +12,9 @@ LoopStats run_main_loop(const LoopConfig& config, const LoopCallbacks& callbacks
     MORDOR_ASSERT_MSG(config.fixed_tick_seconds > 0.0, "fixed_tick_seconds must be > 0");
     MORDOR_ASSERT_MSG(config.max_frame_delta_seconds > 0.0, "max_frame_delta_seconds must be > 0");
     MORDOR_ASSERT_MSG(config.max_run_seconds > 0.0, "max_run_seconds must be > 0");
+    MORDOR_ASSERT_MSG(
+        config.max_frame_delta_seconds >= config.fixed_tick_seconds,
+        "max_frame_delta_seconds must be >= fixed_tick_seconds");
 
     using clock = std::chrono::steady_clock;
 
