@@ -34,6 +34,25 @@ See [docs/contributing-docs.md](../docs/contributing-docs.md) for full conventio
 3. Do not add new research candidates without recording them in [docs/research/research-tracks.md](../docs/research/research-tracks.md).
 4. Do not hard-code architectural decisions without a corresponding entry in `docs/decisions/`.
 
+## Git Workflow Rules
+These rules apply to every task.
+
+1. Before starting a task, switch to `master` and pull the latest changes.
+2. Every task must be done on a new branch created from the latest `master`.
+3. Use one task branch per task. Do not reuse old branches.
+4. Commit task changes to that task branch.
+5. Open a pull request targeting `master` for review.
+6. Do not begin the next task until the current task PR is reviewed and merged to `master`.
+7. After merge, pull latest `master` again before creating the next task branch.
+
+Recommended command sequence:
+1. `git checkout master`
+2. `git pull --ff-only origin master`
+3. `git checkout -b task/<short-task-name>`
+4. Implement changes, then `git add -A && git commit -m "<message>"`
+5. Push and open PR to `master`
+6. After merge: `git checkout master && git pull --ff-only origin master`
+
 ## Code Rules
 
 ### Language and portability
