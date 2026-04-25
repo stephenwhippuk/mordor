@@ -49,8 +49,8 @@ LoopStats run_main_loop(const LoopConfig& config, const LoopCallbacks& callbacks
         callbacks.render(alpha);
         ++stats.render_frames;
 
-        // Small sleep prevents busy-spin in this bootstrap loop.
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        // Yield to the scheduler without enforcing fixed pacing in this reusable loop.
+        std::this_thread::yield();
     }
 
     return stats;
