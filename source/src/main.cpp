@@ -7,6 +7,10 @@
 #include <cstdint>
 #include <vector>
 
+#ifndef MODOR_BUILD_TYPE
+    #define MORDOR_BUILD_TYPE "unknown"
+#endif
+
 struct DemoWorld
 {
     uint64_t m_tick_count{0};
