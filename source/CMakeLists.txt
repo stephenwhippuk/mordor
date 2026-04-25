@@ -84,6 +84,13 @@ if(CLANG_FORMAT_EXE)
         COMMENT "Running clang-format on source/include"
         VERBATIM
     )
+else()
+    message(WARNING "clang-format not found: 'format' target will be a no-op")
+    add_custom_target(format
+        COMMAND ${CMAKE_COMMAND} -E echo "clang-format not found; skipping format step"
+        COMMENT "No-op format target (clang-format unavailable)"
+        VERBATIM
+    )
 endif()
 
 find_program(CLANG_TIDY_EXE NAMES clang-tidy)
@@ -95,6 +102,13 @@ if(CLANG_TIDY_EXE)
                 ${MORDOR_SOURCES}
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         COMMENT "Running clang-tidy on sources"
+        VERBATIM
+    )
+else()
+    message(WARNING "clang-tidy not found: 'lint' target will be a no-op")
+    add_custom_target(lint
+        COMMAND ${CMAKE_COMMAND} -E echo "clang-tidy not found; skipping lint step"
+        COMMENT "No-op lint target (clang-tidy unavailable)"
         VERBATIM
     )
 endif()
