@@ -44,7 +44,8 @@ LoopStats run_main_loop(const LoopConfig& config, const LoopCallbacks& callbacks
             ++stats.simulation_steps;
         }
 
-        const double alpha = accumulator / config.fixed_tick_seconds;
+        const double raw_alpha = accumulator / config.fixed_tick_seconds;
+        const double alpha = raw_alpha < 0.0 ? 0.0 : (raw_alpha > 1.0 ? 1.0 : raw_alpha);
         callbacks.render(alpha);
         ++stats.render_frames;
 
