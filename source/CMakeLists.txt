@@ -92,9 +92,9 @@ if(CLANG_TIDY_EXE)
         COMMAND ${CLANG_TIDY_EXE}
                 --config-file=${CMAKE_SOURCE_DIR}/.clang-tidy
                 -p ${CMAKE_BINARY_DIR}
-                ${MORDOR_ALL_CODE_FILES}
+                ${MORDOR_SOURCES}
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        COMMENT "Running clang-tidy on source/include"
+        COMMENT "Running clang-tidy on sources"
         VERBATIM
     )
 endif()
