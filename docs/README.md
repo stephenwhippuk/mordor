@@ -27,6 +27,9 @@ This documentation is split by concern so planning can grow without turning into
 ### Decisions
 1. [Decision Log Guide](decisions/README.md)
 2. [Decision Template](decisions/0000-decision-template.md)
+3. [0001: Logging Library Selection](decisions/0001-logging-library.md)
+4. [0002: Rendering Baseline](decisions/0002-rendering-baseline.md)
+5. [0003: Initial Runtime Data Model Strategy](decisions/0003-data-model-strategy.md)
 
 ### Documentation
 1. [Documentation Contribution Guide](contributing-docs.md)
