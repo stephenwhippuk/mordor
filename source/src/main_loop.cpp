@@ -28,6 +28,11 @@ LoopStats run_main_loop(const LoopConfig& config, const LoopCallbacks& callbacks
 
     while (std::chrono::duration<double>(clock::now() - start).count() < config.m_max_run_seconds)
     {
+        if (callbacks.m_should_continue && !callbacks.m_should_continue())
+        {
+            break;
+        }
+
         const auto now = clock::now();
         double frame_delta = std::chrono::duration<double>(now - last).count();
         last = now;
