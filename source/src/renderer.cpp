@@ -216,6 +216,9 @@ void Renderer::draw_debug_map(const std::vector<DebugTile>& tiles)
     // Temporary map draw path without shader pipeline: use scissor-constrained clears.
     glEnable(GL_SCISSOR_TEST);
 
+    const float c = std::cos(m_camera.m_rotation_radians);
+    const float s = std::sin(m_camera.m_rotation_radians);
+
     for (const DebugTile& tile : tiles)
     {
         const float world_cx = tile.m_x - m_camera.m_x;
@@ -224,8 +227,6 @@ void Renderer::draw_debug_map(const std::vector<DebugTile>& tiles)
         const float scaled_cx = world_cx * m_camera.m_zoom;
         const float scaled_cy = world_cy * m_camera.m_zoom;
 
-        const float c = std::cos(m_camera.m_rotation_radians);
-        const float s = std::sin(m_camera.m_rotation_radians);
         const float rot_cx = (scaled_cx * c) - (scaled_cy * s);
         const float rot_cy = (scaled_cx * s) + (scaled_cy * c);
 
