@@ -15,6 +15,9 @@
 #endif
 #endif
 
+#include <algorithm>
+#include <cmath>
+
 namespace mordor {
 
 namespace {
@@ -23,6 +26,11 @@ namespace {
 void glfw_error_callback(int code, const char* description)
 {
     MORDOR_LOG_ERROR("GLFW error {}: {}", code, description ? description : "unknown");
+}
+
+bool key_down(GLFWwindow* window, int key)
+{
+    return glfwGetKey(window, key) == GLFW_PRESS;
 }
 #endif
 
@@ -118,6 +126,74 @@ bool Renderer::should_close() const
 #endif
 }
 
+void Renderer::update_camera_controls(double dt_seconds)
+{
+#if MORDOR_HAS_GLFW
+    if (m_window == nullptr)
+    {
+        return;
+    }
+
+    const float dt = static_cast<float>(dt_seconds);
+
+    float move_x = 0.0F;
+    float move_y = 0.0F;
+
+    if (key_down(m_window, GLFW_KEY_A) || key_down(m_window, GLFW_KEY_LEFT))
+    {
+        move_x -= 1.0F;
+    }
+    if (key_down(m_window, GLFW_KEY_D) || key_down(m_window, GLFW_KEY_RIGHT))
+    {
+        move_x += 1.0F;
+    }
+    if (key_down(m_window, GLFW_KEY_W) || key_down(m_window, GLFW_KEY_UP))
+    {
+        move_y += 1.0F;
+    }
+    if (key_down(m_window, GLFW_KEY_S) || key_down(m_window, GLFW_KEY_DOWN))
+    {
+        move_y -= 1.0F;
+    }
+
+    if (move_x != 0.0F || move_y != 0.0F)
+    {
+        const float mag = std::sqrt((move_x * move_x) + (move_y * move_y));
+        move_x /= mag;
+        move_y /= mag;
+
+        m_camera.m_x += move_x * m_pan_speed * dt;
+        m_camera.m_y += move_y * m_pan_speed * dt;
+    }
+
+    if (key_down(m_window, GLFW_KEY_Q))
+    {
+        m_camera.m_rotation_radians -= m_rotation_speed * dt;
+    }
+    if (key_down(m_window, GLFW_KEY_E))
+    {
+        m_camera.m_rotation_radians += m_rotation_speed * dt;
+    }
+
+    if (key_down(m_window, GLFW_KEY_R))
+    {
+        m_camera.m_zoom += m_zoom_speed * dt;
+    }
+    if (key_down(m_window, GLFW_KEY_F))
+    {
+        m_camera.m_zoom -= m_zoom_speed * dt;
+    }
+    m_camera.m_zoom = std::clamp(m_camera.m_zoom, 0.2F, 4.0F);
+#else
+    (void)dt_seconds;
+#endif
+}
+
+CameraState Renderer::camera_state() const
+{
+    return m_camera;
+}
+
 void Renderer::begin_frame()
 {
 #if MORDOR_HAS_OPENGL
@@ -140,13 +216,44 @@ void Renderer::draw_debug_map(const std::vector<DebugTile>& tiles)
     // Temporary map draw path without shader pipeline: use scissor-constrained clears.
     glEnable(GL_SCISSOR_TEST);
 
+    const float c = std::cos(m_camera.m_rotation_radians);
+    const float s = std::sin(m_camera.m_rotation_radians);
+
     for (const DebugTile& tile : tiles)
     {
-        const int x = static_cast<int>(tile.m_x);
-        const int y = static_cast<int>(tile.m_y);
-        const int w = static_cast<int>(tile.m_width);
-        const int h = static_cast<int>(tile.m_height);
+        const float world_cx = tile.m_x - m_camera.m_x;
+        const float world_cy = tile.m_y - m_camera.m_y;
 
+        const float scaled_cx = world_cx * m_camera.m_zoom;
+        const float scaled_cy = world_cy * m_camera.m_zoom;
+
+        const float rot_cx = (scaled_cx * c) - (scaled_cy * s);
+        const float rot_cy = (scaled_cx * s) + (scaled_cy * c);
+
+        const float screen_cx = (static_cast<float>(m_window_width) * 0.5F) + rot_cx;
+        const float screen_cy = (static_cast<float>(m_window_height) * 0.5F) + rot_cy;
+
+        const float scaled_w = tile.m_width * m_camera.m_zoom;
+        const float scaled_h = tile.m_height * m_camera.m_zoom;
+
+        if (scaled_w <= 0.0F || scaled_h <= 0.0F)
+        {
+            continue;
+        }
+
+        const float half_w = scaled_w * 0.5F;
+        const float half_h = scaled_h * 0.5F;
+        const float abs_c = std::abs(c);
+        const float abs_s = std::abs(s);
+        const float aabb_half_w = (abs_c * half_w) + (abs_s * half_h);
+        const float aabb_half_h = (abs_s * half_w) + (abs_c * half_h);
+
+        const int x = static_cast<int>(std::floor(screen_cx - aabb_half_w));
+        const int y = static_cast<int>(std::floor(screen_cy - aabb_half_h));
+        const int right = static_cast<int>(std::ceil(screen_cx + aabb_half_w));
+        const int top = static_cast<int>(std::ceil(screen_cy + aabb_half_h));
+        const int w = right - x;
+        const int h = top - y;
         if (w <= 0 || h <= 0)
         {
             continue;

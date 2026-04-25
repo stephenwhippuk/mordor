@@ -7,8 +7,8 @@
 #include <cstdint>
 #include <vector>
 
-#ifndef MODOR_BUILD_TYPE
-    #define MORDOR_BUILD_TYPE "unknown"
+#ifndef MORDOR_BUILD_TYPE
+    #define MORDOR_BUILD_TYPE "Unknown"
 #endif
 
 struct DemoWorld
@@ -50,13 +50,23 @@ int main()
     config.m_max_run_seconds = 120.0;
 
     mordor::LoopCallbacks callbacks{};
-    callbacks.m_simulate = [&world](double dt) {
+    callbacks.m_simulate = [&world, &renderer](double dt) {
         MORDOR_PROFILE_SCOPE("simulate");
         ++world.m_tick_count;
 
+        renderer.update_camera_controls(dt);
+
         if (world.m_tick_count % 60 == 0)
         {
-            MORDOR_LOG_DEBUG("simulate tick={} dt={}", world.m_tick_count, dt);
+            const mordor::CameraState camera = renderer.camera_state();
+            MORDOR_LOG_DEBUG(
+                "simulate tick={} dt={} camera=({}, {}, zoom={}, rot={})",
+                world.m_tick_count,
+                dt,
+                camera.m_x,
+                camera.m_y,
+                camera.m_zoom,
+                camera.m_rotation_radians);
         }
     };
     callbacks.m_render = [&renderer, &debug_map](double alpha) {
