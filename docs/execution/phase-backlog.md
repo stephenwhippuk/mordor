@@ -17,7 +17,7 @@ Provide implementation-level work items with explicit dependencies across develo
 |---|---|---|---|---|---|
 | P0-01 | Set up build system and target profiles | None | High | Complete | plan/development-phases.md |
 | P0-02 | Add logging, assertions, and profiling hooks | P0-01 | High | Complete | decisions/0001-logging-library.md |
-| P0-03 | Configure formatting, linting, static analysis | P0-01 | Medium | Not Started | plan/development-phases.md |
+| P0-03 | Configure formatting, linting, static analysis | P0-01 | Medium | Complete | plan/development-phases.md |
 | P0-04 | Create initial decision records for rendering and data model | P0-01 | High | In Progress | decisions/0001-logging-library.md |
 
 ## Phase 1 Backlog

@@ -38,6 +38,17 @@ file(GLOB_RECURSE MORDOR_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c"
 )
 
+file(GLOB_RECURSE MORDOR_HEADERS
+    CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
+)
+
+set(MORDOR_ALL_CODE_FILES
+    ${MORDOR_SOURCES}
+    ${MORDOR_HEADERS}
+)
+
 add_executable(mordor ${MORDOR_SOURCES})
 
 target_include_directories(mordor
@@ -62,6 +73,43 @@ else()
     target_compile_options(mordor PRIVATE
         -Wall -Wextra -Wpedantic -Wconversion -Wshadow
         $<$<CONFIG:Release>:-O2>
+    )
+endif()
+
+find_program(CLANG_FORMAT_EXE NAMES clang-format)
+if(CLANG_FORMAT_EXE)
+    add_custom_target(format
+        COMMAND ${CLANG_FORMAT_EXE} -i ${MORDOR_ALL_CODE_FILES}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Running clang-format on source/include"
+        VERBATIM
+    )
+else()
+    message(WARNING "clang-format not found: 'format' target will be a no-op")
+    add_custom_target(format
+        COMMAND ${CMAKE_COMMAND} -E echo "clang-format not found; skipping format step"
+        COMMENT "No-op format target (clang-format unavailable)"
+        VERBATIM
+    )
+endif()
+
+find_program(CLANG_TIDY_EXE NAMES clang-tidy)
+if(CLANG_TIDY_EXE)
+    add_custom_target(lint
+        COMMAND ${CLANG_TIDY_EXE}
+                --config-file=${CMAKE_SOURCE_DIR}/.clang-tidy
+                -p ${CMAKE_BINARY_DIR}
+                ${MORDOR_SOURCES}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Running clang-tidy on sources"
+        VERBATIM
+    )
+else()
+    message(WARNING "clang-tidy not found: 'lint' target will be a no-op")
+    add_custom_target(lint
+        COMMAND ${CMAKE_COMMAND} -E echo "clang-tidy not found; skipping lint step"
+        COMMENT "No-op lint target (clang-tidy unavailable)"
+        VERBATIM
     )
 endif()
 
