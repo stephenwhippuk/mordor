@@ -30,11 +30,15 @@ option(MORDOR_ENABLE_CPPCHECK "Run cppcheck during compilation" OFF)
 if(MORDOR_ENABLE_CLANG_TIDY)
     find_program(CLANG_TIDY_EXE NAMES clang-tidy)
     if(CLANG_TIDY_EXE)
+        set(CMAKE_C_CLANG_TIDY
+            ${CLANG_TIDY_EXE}
+            --config-file=${CMAKE_SOURCE_DIR}/.clang-tidy
+        )
         set(CMAKE_CXX_CLANG_TIDY
             ${CLANG_TIDY_EXE}
             --config-file=${CMAKE_SOURCE_DIR}/.clang-tidy
         )
-        message(STATUS "clang-tidy enabled: ${CLANG_TIDY_EXE}")
+        message(STATUS "clang-tidy enabled for C/C++: ${CLANG_TIDY_EXE}")
     else()
         message(WARNING "MORDOR_ENABLE_CLANG_TIDY=ON but clang-tidy was not found; disabling")
         set(MORDOR_ENABLE_CLANG_TIDY OFF CACHE BOOL "Run clang-tidy during compilation" FORCE)
@@ -44,13 +48,19 @@ endif()
 if(MORDOR_ENABLE_CPPCHECK)
     find_program(CPPCHECK_EXE NAMES cppcheck)
     if(CPPCHECK_EXE)
+        set(CMAKE_C_CPPCHECK
+            ${CPPCHECK_EXE}
+            --enable=warning,performance,portability
+            --inline-suppr
+            --suppress=missingIncludeSystem
+        )
         set(CMAKE_CXX_CPPCHECK
             ${CPPCHECK_EXE}
             --enable=warning,performance,portability
             --inline-suppr
             --suppress=missingIncludeSystem
         )
-        message(STATUS "cppcheck enabled: ${CPPCHECK_EXE}")
+        message(STATUS "cppcheck enabled for C/C++: ${CPPCHECK_EXE}")
     else()
         message(WARNING "MORDOR_ENABLE_CPPCHECK=ON but cppcheck was not found; disabling")
         set(MORDOR_ENABLE_CPPCHECK OFF CACHE BOOL "Run cppcheck during compilation" FORCE)
