@@ -3,9 +3,11 @@
 #include "mordor/profiler.hpp"
 #include "mordor/main_loop.hpp"
 
+#include <cstdint>
+
 struct DemoWorld
 {
-    uint64_t tick_count{0};
+    uint64_t m_tick_count{0};
 };
 
 int main()
@@ -23,23 +25,23 @@ int main()
     DemoWorld world{};
 
     mordor::LoopConfig config{};
-    config.fixed_tick_seconds = 1.0 / 60.0;
-    config.max_frame_delta_seconds = 0.25;
-    config.max_run_seconds = 2.0;
+    config.m_fixed_tick_seconds = 1.0 / 60.0;
+    config.m_max_frame_delta_seconds = 0.25;
+    config.m_max_run_seconds = 2.0;
 
     auto stats = mordor::run_main_loop(
         config,
         mordor::LoopCallbacks{
-            .simulate = [&world](double dt) {
+            .m_simulate = [&world](double dt) {
                 MORDOR_PROFILE_SCOPE("simulate");
-                ++world.tick_count;
+                ++world.m_tick_count;
 
-                if (world.tick_count % 60 == 0)
+                if (world.m_tick_count % 60 == 0)
                 {
-                    MORDOR_LOG_DEBUG("simulate tick={} dt={}", world.tick_count, dt);
+                    MORDOR_LOG_DEBUG("simulate tick={} dt={}", world.m_tick_count, dt);
                 }
             },
-            .render = [](double alpha) {
+            .m_render = [](double alpha) {
                 MORDOR_PROFILE_SCOPE("render");
 
                 // Placeholder until real renderer is connected in P1-02.
@@ -52,8 +54,8 @@ int main()
 
     MORDOR_LOG_INFO(
         "loop complete: simulation_steps={} render_frames={}",
-        stats.simulation_steps,
-        stats.render_frames);
+        stats.m_simulation_steps,
+        stats.m_render_frames);
 
     mordor::profiler::for_each([](std::string_view name, uint64_t ns) {
         MORDOR_LOG_DEBUG("Profile [{}]: {} ns", name, ns);
