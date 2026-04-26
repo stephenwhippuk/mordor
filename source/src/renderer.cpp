@@ -266,7 +266,7 @@ void Renderer::draw_debug_map(const std::vector<DebugTile>& tiles)
         }
 
         glScissor(x, y, w, h);
-        glClearColor(0.25F, 0.36F, 0.28F, 1.0F);
+        glClearColor(tile.m_r, tile.m_g, tile.m_b, 1.0F);
         glClear(GL_COLOR_BUFFER_BIT);
     }
 

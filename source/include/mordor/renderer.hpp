@@ -22,6 +22,9 @@ struct DebugTile
     float m_y{0.0F};
     float m_width{10.0F};
     float m_height{10.0F};
+    float m_r{0.25F};
+    float m_g{0.36F};
+    float m_b{0.28F};
 };
 
 struct CameraState
