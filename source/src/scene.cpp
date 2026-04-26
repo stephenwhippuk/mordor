@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <utility>
 
 namespace mordor {
@@ -50,6 +51,13 @@ bool contains_bounds(const Bounds3& outer, const Bounds3& inner)
     return outer.m_min.m_x <= inner.m_min.m_x && outer.m_max.m_x >= inner.m_max.m_x
         && outer.m_min.m_y <= inner.m_min.m_y && outer.m_max.m_y >= inner.m_max.m_y
         && outer.m_min.m_z <= inner.m_min.m_z && outer.m_max.m_z >= inner.m_max.m_z;
+}
+
+bool point_in_bounds(const Float3& point, const Bounds3& bounds)
+{
+    return point.m_x >= bounds.m_min.m_x && point.m_x <= bounds.m_max.m_x
+        && point.m_y >= bounds.m_min.m_y && point.m_y <= bounds.m_max.m_y
+        && point.m_z >= bounds.m_min.m_z && point.m_z <= bounds.m_max.m_z;
 }
 
 Bounds3 expand_bounds(const Bounds3& bounds, float factor)
@@ -427,6 +435,129 @@ std::vector<SceneNodeId> query_scene_bounds(const Scene& scene, const Bounds3& b
     }
 
     return out_node_ids;
+}
+
+std::vector<SceneNodeId> query_scene_point(
+    const Scene& scene,
+    const Float3& world_point,
+    uint32_t required_flags)
+{
+    std::vector<SceneNodeId> out_node_ids{};
+    if (scene.m_spatial_index.m_cells.empty())
+    {
+        return out_node_ids;
+    }
+
+    std::vector<bool> seen(scene.m_nodes.size() + 1U, false);
+    std::vector<int> pending_cells{0};
+    while (!pending_cells.empty())
+    {
+        const int cell_index = pending_cells.back();
+        pending_cells.pop_back();
+
+        const SceneOctreeCell& cell = scene.m_spatial_index.m_cells[static_cast<std::size_t>(cell_index)];
+        if (!point_in_bounds(world_point, cell.m_query_bounds))
+        {
+            continue;
+        }
+
+        for (SceneNodeId node_id : cell.m_node_ids)
+        {
+            const std::size_t seen_index = static_cast<std::size_t>(node_id);
+            if (seen_index >= seen.size() || seen[seen_index])
+            {
+                continue;
+            }
+
+            const SceneNode* node = find_scene_node(scene, node_id);
+            if (node == nullptr)
+            {
+                continue;
+            }
+
+            if (required_flags != 0U && !scene_node_has_flags(*node, required_flags))
+            {
+                continue;
+            }
+
+            if (point_in_bounds(world_point, node->m_world_bounds))
+            {
+                seen[seen_index] = true;
+                out_node_ids.push_back(node_id);
+            }
+        }
+
+        for (int child_index : cell.m_child_indices)
+        {
+            if (child_index >= 0)
+            {
+                pending_cells.push_back(child_index);
+            }
+        }
+    }
+
+    return out_node_ids;
+}
+
+SceneNodeId pick_scene_node_at_point(
+    const Scene& scene,
+    const Float3& world_point,
+    uint32_t required_flags)
+{
+    const std::vector<SceneNodeId> candidates =
+        query_scene_point(scene, world_point, required_flags);
+
+    SceneNodeId best_id = k_invalid_scene_node_id;
+    float best_area = std::numeric_limits<float>::max();
+
+    for (SceneNodeId node_id : candidates)
+    {
+        const SceneNode* node = find_scene_node(scene, node_id);
+        if (node == nullptr)
+        {
+            continue;
+        }
+
+        const float width = node->m_world_bounds.m_max.m_x - node->m_world_bounds.m_min.m_x;
+        const float height = node->m_world_bounds.m_max.m_y - node->m_world_bounds.m_min.m_y;
+        const float area = width * height;
+        if (area < best_area || (area == best_area && node_id < best_id))
+        {
+            best_id = node_id;
+            best_area = area;
+        }
+    }
+
+    return best_id;
+}
+
+SceneDebugMetrics collect_scene_debug_metrics(const Scene& scene)
+{
+    SceneDebugMetrics metrics{};
+    metrics.m_cell_count = scene.m_spatial_index.m_cells.size();
+    metrics.m_indexed_node_count = scene.m_spatial_index.m_indexed_node_count;
+
+    for (const SceneOctreeCell& cell : scene.m_spatial_index.m_cells)
+    {
+        metrics.m_max_depth = std::max(metrics.m_max_depth, cell.m_depth);
+
+        bool has_child = false;
+        for (int child_index : cell.m_child_indices)
+        {
+            if (child_index >= 0)
+            {
+                has_child = true;
+                break;
+            }
+        }
+
+        if (!has_child)
+        {
+            ++metrics.m_leaf_cell_count;
+        }
+    }
+
+    return metrics;
 }
 
 bool scene_node_has_flags(const SceneNode& node, uint32_t required_flags)

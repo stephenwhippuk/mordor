@@ -82,9 +82,26 @@ struct Scene
     SceneSpatialIndex m_spatial_index{};
 };
 
+struct SceneDebugMetrics
+{
+    std::size_t m_cell_count{0};
+    std::size_t m_leaf_cell_count{0};
+    int m_max_depth{0};
+    std::size_t m_indexed_node_count{0};
+};
+
 bool build_scene_from_dungeon_map(const DungeonMap& map, Scene& out_scene);
 const SceneNode* find_scene_node(const Scene& scene, SceneNodeId node_id);
 std::vector<SceneNodeId> query_scene_bounds(const Scene& scene, const Bounds3& bounds);
+std::vector<SceneNodeId> query_scene_point(
+    const Scene& scene,
+    const Float3& world_point,
+    uint32_t required_flags);
+SceneNodeId pick_scene_node_at_point(
+    const Scene& scene,
+    const Float3& world_point,
+    uint32_t required_flags);
+SceneDebugMetrics collect_scene_debug_metrics(const Scene& scene);
 bool scene_node_has_flags(const SceneNode& node, uint32_t required_flags);
 
 } // namespace mordor
