@@ -212,12 +212,14 @@ void insert_scene_node(Scene& scene, int cell_index, SceneNodeId node_id)
     ++index.m_indexed_node_count;
 }
 
+// NOTE: Scene query functions are not thread-safe. All queries must be
+// called from the same thread that owns the Scene instance.
 uint32_t begin_query_stamp(const Scene& scene)
 {
     const std::size_t stamp_count = scene.m_nodes.size() + 1U;
     if (scene.m_query_stamps.size() < stamp_count)
     {
-        scene.m_query_stamps.assign(stamp_count, 0U);
+        scene.m_query_stamps.resize(stamp_count, 0U);
     }
 
     ++scene.m_query_generation;
