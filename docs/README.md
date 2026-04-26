@@ -12,6 +12,7 @@ This documentation is split by concern so planning can grow without turning into
 
 ### Architecture
 1. [Engine Architecture](architecture/engine-architecture.md)
+2. [World Scene Structure](architecture/world-scene-structure.md)
 
 ### Planning
 1. [Development Phases](plan/development-phases.md)
@@ -31,6 +32,7 @@ This documentation is split by concern so planning can grow without turning into
 4. [0002: Rendering Baseline](decisions/0002-rendering-baseline.md)
 5. [0003: Initial Runtime Data Model Strategy](decisions/0003-data-model-strategy.md)
 6. [0004: Windowing and OpenGL Context Library](decisions/0004-windowing-and-context-library.md)
+6. [0005: World Scene and Spatial Query Structure](decisions/0005-scene-spatial-structure.md)
 
 ### Documentation
 1. [Documentation Contribution Guide](contributing-docs.md)

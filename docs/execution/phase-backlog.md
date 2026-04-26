@@ -29,6 +29,7 @@ Provide implementation-level work items with explicit dependencies across develo
 | P1-03 | Implement isometric camera controls | P1-02 | High | Complete | architecture/engine-architecture.md |
 | P1-04 | Add input binding/action mapping layer | P1-01 | Medium | Complete | plan/development-phases.md |
 | P1-05 | Load and render handcrafted dungeon test map | P1-02, P1-03 | High | Complete | execution/next-steps.md |
+| P1-06 | Define world scene graph and spatial query baseline | P1-05 | High | Complete | decisions/0005-scene-spatial-structure.md |
 
 ### Known Limitations — P1-03
 
@@ -43,10 +44,10 @@ Must be resolved before rotation is considered production-quality. Tracked for P
 
 | Task ID | Description | Depends On | Priority | Status | Deliverable Link |
 |---|---|---|---|---|---|
-| P2-01 | Define actor and interactable component schema | P1-05 | High | Not Started | architecture/engine-architecture.md |
+| P2-01 | Define actor and interactable component schema | P1-06 | High | Not Started | architecture/world-scene-structure.md |
 | P2-02 | Implement interaction state machines (door/chest/trap) | P2-01 | High | Not Started | plan/development-phases.md |
 | P2-03 | Implement key and switch logic model | P2-02 | High | Not Started | plan/basic-engine-release.md |
-| P2-04 | Implement blocking and occupancy rules | P2-01 | Medium | Not Started | architecture/engine-architecture.md |
+| P2-04 | Implement blocking and occupancy rules | P1-06 | Medium | Not Started | architecture/world-scene-structure.md |
 
 ## Phase 3 Backlog
 
