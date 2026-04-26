@@ -30,6 +30,15 @@ Provide implementation-level work items with explicit dependencies across develo
 | P1-04 | Add input binding/action mapping layer | P1-01 | Medium | Not Started | plan/development-phases.md |
 | P1-05 | Load and render handcrafted dungeon test map | P1-02, P1-03 | High | Not Started | execution/next-steps.md |
 
+### Known Limitations — P1-03
+
+**Camera rotation in the scissor-based debug draw path is visually incorrect.**
+Rotation is applied to each tile's centre position, but the tile rectangle itself is axis-aligned (width/height are only scaled, not rotated). Tiles therefore do not rotate with the camera. This was accepted as a known defect for the debug path.
+Fix options when a real quad/shader pipeline exists (P1-05 or later):
+- (a) Disable rotation in this path until a proper pipeline is in place, or
+- (b) Compute the rotated rectangle's AABB and use that for the scissor rect as an approximation.
+Must be resolved before rotation is considered production-quality. Tracked for P1-05 or the first shader-based tile draw task.
+
 ## Phase 2 Backlog
 
 | Task ID | Description | Depends On | Priority | Status | Deliverable Link |
