@@ -342,13 +342,14 @@ bool build_scene_from_dungeon_map(const DungeonMap& map, Scene& out_scene)
         }
     }
 
+    const float spatial_index_looseness = 1.5F;
     scene.m_spatial_index = SceneSpatialIndex{
         .m_root_bounds = root_bounds,
-        .m_looseness = 1.5F,
+        .m_looseness = spatial_index_looseness,
         .m_max_depth = 4,
         .m_cells = {SceneOctreeCell{
             .m_strict_bounds = root_bounds,
-            .m_query_bounds = expand_bounds(root_bounds, 1.5F),
+            .m_query_bounds = expand_bounds(root_bounds, spatial_index_looseness),
             .m_depth = 0,
             .m_child_indices = {-1, -1, -1, -1, -1, -1, -1, -1},
             .m_node_ids = {},
