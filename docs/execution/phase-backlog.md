@@ -30,6 +30,7 @@ Provide implementation-level work items with explicit dependencies across develo
 | P1-04 | Add input binding/action mapping layer | P1-01 | Medium | Complete | plan/development-phases.md |
 | P1-05 | Load and render handcrafted dungeon test map | P1-02, P1-03 | High | Complete | execution/next-steps.md |
 | P1-06 | Define world scene graph and spatial query baseline | P1-05 | High | Complete | decisions/0005-scene-spatial-structure.md |
+| P1-07 | Implement scene-graph storage and map-emitted scene data | P1-06 | High | Complete | architecture/world-scene-structure.md |
 
 ### Known Limitations — P1-03
 
