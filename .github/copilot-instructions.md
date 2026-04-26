@@ -41,17 +41,19 @@ These rules apply to every task.
 2. Every task must be done on a new branch created from the latest `master`.
 3. Use one task branch per task. Do not reuse old branches.
 4. Commit task changes to that task branch.
-5. Open a pull request targeting `master` for review.
-6. Do not begin the next task until the current task PR is reviewed and merged to `master`.
-7. After merge, pull latest `master` again before creating the next task branch.
+5. Request a local Copilot agent review and resolve high-severity findings before push.
+6. Push branch changes and open a pull request targeting `master` for review.
+7. Do not begin the next task until the current task PR is reviewed and merged to `master`.
+8. After merge, pull latest `master` again before creating the next task branch.
 
 Recommended command sequence:
 1. `git checkout master`
 2. `git pull --ff-only origin master`
 3. `git checkout -b task/<short-task-name>`
 4. Implement changes, then `git add -A && git commit -m "<message>"`
-5. Push and open PR to `master`
-6. After merge: `git checkout master && git pull --ff-only origin master`
+5. Request local Copilot agent review and fix critical findings
+6. Push and open PR to `master`
+7. After merge: `git checkout master && git pull --ff-only origin master`
 
 ## Code Rules
 
