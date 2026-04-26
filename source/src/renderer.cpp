@@ -139,19 +139,25 @@ void Renderer::update_camera_controls(double dt_seconds)
     float move_x = 0.0F;
     float move_y = 0.0F;
 
-    if (key_down(m_window, GLFW_KEY_A) || key_down(m_window, GLFW_KEY_LEFT))
+    const auto is_action_active = [this](InputAction action) {
+        return m_input_bindings.is_action_active(action, [this](int key) {
+            return key_down(m_window, key);
+        });
+    };
+
+    if (is_action_active(InputAction::PanLeft))
     {
         move_x -= 1.0F;
     }
-    if (key_down(m_window, GLFW_KEY_D) || key_down(m_window, GLFW_KEY_RIGHT))
+    if (is_action_active(InputAction::PanRight))
     {
         move_x += 1.0F;
     }
-    if (key_down(m_window, GLFW_KEY_W) || key_down(m_window, GLFW_KEY_UP))
+    if (is_action_active(InputAction::PanUp))
     {
         move_y += 1.0F;
     }
-    if (key_down(m_window, GLFW_KEY_S) || key_down(m_window, GLFW_KEY_DOWN))
+    if (is_action_active(InputAction::PanDown))
     {
         move_y -= 1.0F;
     }
@@ -166,20 +172,20 @@ void Renderer::update_camera_controls(double dt_seconds)
         m_camera.m_y += move_y * m_pan_speed * dt;
     }
 
-    if (key_down(m_window, GLFW_KEY_Q))
+    if (is_action_active(InputAction::RotateLeft))
     {
         m_camera.m_rotation_radians -= m_rotation_speed * dt;
     }
-    if (key_down(m_window, GLFW_KEY_E))
+    if (is_action_active(InputAction::RotateRight))
     {
         m_camera.m_rotation_radians += m_rotation_speed * dt;
     }
 
-    if (key_down(m_window, GLFW_KEY_R))
+    if (is_action_active(InputAction::ZoomIn))
     {
         m_camera.m_zoom += m_zoom_speed * dt;
     }
-    if (key_down(m_window, GLFW_KEY_F))
+    if (is_action_active(InputAction::ZoomOut))
     {
         m_camera.m_zoom -= m_zoom_speed * dt;
     }

@@ -22,6 +22,9 @@ Responsibilities:
 3. Timing services.
 4. Threading primitives.
 
+Current status:
+1. Initial input action-binding layer is in place, mapping physical keys to engine actions for camera controls.
+
 Constraints:
 1. Linux-first implementation with portable interfaces.
 2. No OS-specific includes outside this layer.
@@ -48,6 +51,7 @@ Current baseline:
 1. OpenGL 4.1 core profile context (decision 0002).
 2. GLFW-based window/context bootstrap (decision 0004).
 3. Temporary debug map draw path implemented as scissor-constrained clear regions until shader/VBO pipeline lands.
+4. Camera movement consumes input actions from the platform input binding layer rather than hard-coded key checks.
 
 Ordering note:
 1. Ship stable world rendering before advanced visual effects.

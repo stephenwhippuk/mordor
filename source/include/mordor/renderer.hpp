@@ -1,5 +1,7 @@
 #pragma once
 
+#include "mordor/input.hpp"
+
 #include <cstdint>
 #include <vector>
 
@@ -56,6 +58,7 @@ private:
     int m_window_width{0};
     int m_window_height{0};
 
+    InputBindings m_input_bindings{};
     CameraState m_camera{};
     float m_pan_speed{350.0F};
     float m_zoom_speed{1.0F};

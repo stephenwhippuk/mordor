@@ -27,7 +27,7 @@ Provide implementation-level work items with explicit dependencies across develo
 | P1-01 | Implement fixed tick simulation loop | P0-02 | High | Complete | plan/development-phases.md |
 | P1-02 | Build OpenGL renderer bootstrap and map draw path | P0-04, P1-01 | High | Complete | architecture/engine-architecture.md |
 | P1-03 | Implement isometric camera controls | P1-02 | High | Complete | architecture/engine-architecture.md |
-| P1-04 | Add input binding/action mapping layer | P1-01 | Medium | Not Started | plan/development-phases.md |
+| P1-04 | Add input binding/action mapping layer | P1-01 | Medium | Complete | plan/development-phases.md |
 | P1-05 | Load and render handcrafted dungeon test map | P1-02, P1-03 | High | Not Started | execution/next-steps.md |
 
 ### Known Limitations — P1-03
