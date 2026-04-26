@@ -212,6 +212,24 @@ void insert_scene_node(Scene& scene, int cell_index, SceneNodeId node_id)
     ++index.m_indexed_node_count;
 }
 
+uint32_t begin_query_stamp(const Scene& scene)
+{
+    const std::size_t stamp_count = scene.m_nodes.size() + 1U;
+    if (scene.m_query_stamps.size() < stamp_count)
+    {
+        scene.m_query_stamps.assign(stamp_count, 0U);
+    }
+
+    ++scene.m_query_generation;
+    if (scene.m_query_generation == 0U)
+    {
+        std::fill(scene.m_query_stamps.begin(), scene.m_query_stamps.end(), 0U);
+        scene.m_query_generation = 1U;
+    }
+
+    return scene.m_query_generation;
+}
+
 Bounds3 scene_root_bounds_for_map(const DungeonMap& map)
 {
     const float width = static_cast<float>(map.m_width) * k_scene_tile_world_size;
@@ -397,7 +415,7 @@ std::vector<SceneNodeId> query_scene_bounds(const Scene& scene, const Bounds3& b
         return out_node_ids;
     }
 
-    std::vector<bool> seen(scene.m_nodes.size() + 1U, false);
+    const uint32_t current_gen = begin_query_stamp(scene);
     std::vector<int> pending_cells{0};
     while (!pending_cells.empty())
     {
@@ -412,8 +430,9 @@ std::vector<SceneNodeId> query_scene_bounds(const Scene& scene, const Bounds3& b
 
         for (SceneNodeId node_id : cell.m_node_ids)
         {
-            const std::size_t seen_index = static_cast<std::size_t>(node_id);
-            if (seen_index >= seen.size() || seen[seen_index])
+            const std::size_t stamp_index = static_cast<std::size_t>(node_id);
+            if (stamp_index >= scene.m_query_stamps.size()
+                || scene.m_query_stamps[stamp_index] == current_gen)
             {
                 continue;
             }
@@ -421,7 +440,7 @@ std::vector<SceneNodeId> query_scene_bounds(const Scene& scene, const Bounds3& b
             const SceneNode* node = find_scene_node(scene, node_id);
             if (node != nullptr && bounds_intersect(node->m_world_bounds, bounds))
             {
-                seen[seen_index] = true;
+                scene.m_query_stamps[stamp_index] = current_gen;
                 out_node_ids.push_back(node_id);
             }
         }
@@ -449,7 +468,7 @@ std::vector<SceneNodeId> query_scene_point(
         return out_node_ids;
     }
 
-    std::vector<bool> seen(scene.m_nodes.size() + 1U, false);
+    const uint32_t current_gen = begin_query_stamp(scene);
     std::vector<int> pending_cells{0};
     while (!pending_cells.empty())
     {
@@ -464,8 +483,9 @@ std::vector<SceneNodeId> query_scene_point(
 
         for (SceneNodeId node_id : cell.m_node_ids)
         {
-            const std::size_t seen_index = static_cast<std::size_t>(node_id);
-            if (seen_index >= seen.size() || seen[seen_index])
+            const std::size_t stamp_index = static_cast<std::size_t>(node_id);
+            if (stamp_index >= scene.m_query_stamps.size()
+                || scene.m_query_stamps[stamp_index] == current_gen)
             {
                 continue;
             }
@@ -483,7 +503,7 @@ std::vector<SceneNodeId> query_scene_point(
 
             if (point_in_bounds(world_point, node->m_world_bounds))
             {
-                seen[seen_index] = true;
+                scene.m_query_stamps[stamp_index] = current_gen;
                 out_node_ids.push_back(node_id);
             }
         }

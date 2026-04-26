@@ -80,6 +80,8 @@ struct Scene
     SceneNodeId m_root_node_id{k_invalid_scene_node_id};
     std::vector<SceneNode> m_nodes{};
     SceneSpatialIndex m_spatial_index{};
+    mutable uint32_t m_query_generation{0U};
+    mutable std::vector<uint32_t> m_query_stamps{};
 };
 
 struct SceneDebugMetrics

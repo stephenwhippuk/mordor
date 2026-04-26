@@ -27,6 +27,12 @@ struct DebugTile
     float m_b{0.28F};
 };
 
+struct FramebufferSize
+{
+    int m_width{0};
+    int m_height{0};
+};
+
 struct CameraState
 {
     float m_x{0.0F};
@@ -50,6 +56,7 @@ public:
     bool should_close() const;
     void update_camera_controls(double dt_seconds);
     CameraState camera_state() const;
+    FramebufferSize framebuffer_size() const;
 
     void begin_frame();
     void draw_debug_map(const std::vector<DebugTile>& tiles);
