@@ -15,7 +15,7 @@ Track delivery progress at milestone level with clear entry and completion crite
 |---|---|---|---|---|---|
 | M0: Foundation Baseline | Build, runtime diagnostics, standards, first decisions | Weeks 1-2 | Complete | Repository initialized and team conventions agreed | Engine boots to empty scene with timing/debug output |
 | M1: Rendered Sandbox | Main loop, camera, input, map rendering | Weeks 3-4 | Complete | M0 complete | Hand-authored test dungeon renders with collision overlays |
-| M2: Core Interactions | Actor movement, doors, chests, traps, keys/switches | Weeks 5-7 | Not Started | M1 complete | Single actor can complete interaction sandbox loop |
+| M2: Core Interactions | Scene-linked actor movement, doors, chests, traps, keys/switches | Weeks 5-7 | Not Started | M1 complete and scene/spatial structure baseline accepted | Single actor can complete interaction sandbox loop |
 | M3: Visibility and Perception | LOS, hearing, fog of war, debug overlays | Weeks 8-10 | Not Started | M2 complete | Perception drives targeting and visible world state |
 | M4: Party RPG Loop | Party commands, abilities, inventory, HUD baseline | Weeks 11-14 | Not Started | M3 complete | Exploration to loot loop is fully playable |
 | M5: Generation v1 | Rule generation, prefabs, solvability validation | Weeks 15-18 | Not Started | M4 complete | Generated dungeons pass validation and are completable |

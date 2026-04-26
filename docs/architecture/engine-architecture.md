@@ -46,6 +46,7 @@ Responsibilities:
 2. Isometric camera control.
 3. Mesh/material loading and rendering.
 4. Debug rendering overlays for development.
+5. View clipping against scene bounds and render submission from scene-query results.
 
 Current baseline:
 1. OpenGL 4.1 core profile context (decision 0002).
@@ -72,6 +73,7 @@ Responsibilities:
 2. Spatial and collision queries.
 3. Visibility and perception systems.
 4. Fog-of-war state management.
+5. Authoritative blocking and occupancy state separate from renderer-oriented scene hierarchy.
 
 Ordering note:
 1. Deterministic behavior is a hard requirement for reliable testing.
@@ -103,6 +105,18 @@ Responsibilities:
 
 Ordering note:
 1. Keep content authoring text-based until data formats stabilize.
+
+## World Scene Structure
+The world runtime is split between authored map content, scene-node state, and simulation-owned spatial state.
+
+Baseline rules:
+1. Runtime scene data uses stable `scene_node_id` handles.
+2. Scene hierarchy organizes world geometry, attachment anchors, and dynamic objects.
+3. A loose octree over node bounds is the broadphase structure for clipping and picking.
+4. Blocking and occupancy remain authoritative in simulation-managed spatial records rather than the scene graph.
+5. Actor and interactable schemas in Phase 2 must attach to this structure instead of inventing their own world references.
+
+See [World Scene Structure](world-scene-structure.md) for the detailed contract.
 
 ## Cross-Cutting Standards
 1. Any system with side effects should emit traceable events.

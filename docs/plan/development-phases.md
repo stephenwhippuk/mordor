@@ -31,6 +31,9 @@ Deliverables:
 2. State machines for door/chest/trap interactions.
 3. Spatial blocking and occupancy logic.
 
+Entry gate:
+1. World scene structure baseline accepted so actor and interactable data can attach to stable scene nodes and query services.
+
 Exit criteria:
 1. One controllable actor can traverse and interact with world mechanics.
 
@@ -85,6 +88,7 @@ Exit criteria:
 
 ## Sequencing Principles
 1. Prioritize deterministic simulation before large feature breadth.
-2. Lock interaction primitives before procedural complexity.
+2. Lock world attachment and broadphase query structure before actor schema work.
 3. Add sophisticated AI only after perception is robust.
 4. Delay rich editor development until schemas are stable.
+5. Lock interaction primitives before procedural complexity.
