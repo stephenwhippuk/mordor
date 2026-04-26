@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cassert>
 #include <cstddef>
 #include <initializer_list>
 #include <vector>
@@ -30,7 +31,13 @@ public:
     template <typename IsKeyDownFn>
     bool is_action_active(InputAction action, IsKeyDownFn&& is_key_down) const
     {
-        const auto& keys = m_bindings[static_cast<std::size_t>(action)];
+        const auto index = static_cast<std::size_t>(action);
+        assert(index < static_cast<std::size_t>(InputAction::Count));
+        if (index >= static_cast<std::size_t>(InputAction::Count))
+        {
+            return false;
+        }
+        const auto& keys = m_bindings[index];
         for (const int key : keys)
         {
             if (is_key_down(key))

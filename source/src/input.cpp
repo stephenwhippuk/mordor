@@ -31,7 +31,13 @@ InputBindings::InputBindings()
 
 void InputBindings::set_bindings(InputAction action, std::initializer_list<int> keys)
 {
-    auto& action_keys = m_bindings[static_cast<std::size_t>(action)];
+    const auto index = static_cast<std::size_t>(action);
+    assert(index < static_cast<std::size_t>(InputAction::Count));
+    if (index >= static_cast<std::size_t>(InputAction::Count))
+    {
+        return;
+    }
+    auto& action_keys = m_bindings[index];
     action_keys.assign(keys.begin(), keys.end());
 }
 
