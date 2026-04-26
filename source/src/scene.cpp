@@ -150,23 +150,23 @@ SceneNodeId add_scene_node(Scene& scene, const SceneNodeCreateInfo& create_info)
 
 int ensure_child_cell(SceneSpatialIndex& index, int parent_cell_index, int octant)
 {
-    SceneOctreeCell& parent = index.m_cells[static_cast<std::size_t>(parent_cell_index)];
-    const int existing = parent.m_child_indices[static_cast<std::size_t>(octant)];
+    const std::size_t parent_index = static_cast<std::size_t>(parent_cell_index);
+    const int existing = index.m_cells[parent_index].m_child_indices[static_cast<std::size_t>(octant)];
     if (existing >= 0)
     {
         return existing;
     }
 
-    const Bounds3 strict_bounds = child_strict_bounds(parent.m_strict_bounds, octant);
+    const Bounds3 strict_bounds = child_strict_bounds(index.m_cells[parent_index].m_strict_bounds, octant);
     const int child_index = static_cast<int>(index.m_cells.size());
     index.m_cells.push_back(SceneOctreeCell{
         .m_strict_bounds = strict_bounds,
         .m_query_bounds = expand_bounds(strict_bounds, index.m_looseness),
-        .m_depth = parent.m_depth + 1,
+        .m_depth = index.m_cells[parent_index].m_depth + 1,
         .m_child_indices = {-1, -1, -1, -1, -1, -1, -1, -1},
         .m_node_ids = {},
     });
-    parent.m_child_indices[static_cast<std::size_t>(octant)] = child_index;
+    index.m_cells[parent_index].m_child_indices[static_cast<std::size_t>(octant)] = child_index;
     return child_index;
 }
 
