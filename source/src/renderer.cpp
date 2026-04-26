@@ -200,6 +200,11 @@ CameraState Renderer::camera_state() const
     return m_camera;
 }
 
+FramebufferSize Renderer::framebuffer_size() const
+{
+    return FramebufferSize{.m_width = m_window_width, .m_height = m_window_height};
+}
+
 void Renderer::begin_frame()
 {
 #if MORDOR_HAS_OPENGL

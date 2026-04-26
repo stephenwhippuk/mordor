@@ -4,9 +4,11 @@
 #include "mordor/main_loop.hpp"
 #include "mordor/renderer.hpp"
 #include "mordor/map.hpp"
+#include "mordor/scene.hpp"
 
 #include <cstdlib>
 #include <cstdint>
+#include <cmath>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -70,27 +72,56 @@ std::vector<std::filesystem::path> map_candidate_paths(int argc, char** argv)
     return paths;
 }
 
-std::vector<mordor::DebugTile> build_debug_tiles_from_map(const mordor::DungeonMap& map)
+std::vector<mordor::DebugTile> build_debug_tiles_from_scene(
+    const mordor::Scene& scene,
+    const mordor::DungeonMap& map)
 {
     std::vector<mordor::DebugTile> tiles{};
-    tiles.reserve(map.m_tiles.size());
+    const std::vector<mordor::SceneNodeId> visible_nodes =
+        mordor::query_scene_bounds(scene, scene.m_spatial_index.m_root_bounds);
+    tiles.reserve(visible_nodes.size());
 
-    constexpr float tile_size = 48.0F;
-    constexpr float origin_x = 0.0F;
-    constexpr float origin_y = 0.0F;
+    const uint32_t renderable_static_flags =
+        mordor::scene_node_category_bits(mordor::SceneNodeCategory::StaticGeometry)
+        | mordor::scene_node_category_bits(mordor::SceneNodeCategory::Renderable);
 
-    for (const mordor::DungeonTile& tile : map.m_tiles)
+    for (mordor::SceneNodeId node_id : visible_nodes)
     {
-        const bool blocked = tile.m_blocks_movement;
+        const mordor::SceneNode* node = mordor::find_scene_node(scene, node_id);
+        if (node == nullptr || !mordor::scene_node_has_flags(*node, renderable_static_flags))
+        {
+            continue;
+        }
+
+        const mordor::DungeonTile* tile = nullptr;
+        if (node->m_payload_index >= 0)
+        {
+            const std::size_t tile_index = static_cast<std::size_t>(node->m_payload_index);
+            if (tile_index < map.m_tiles.size())
+            {
+                tile = &map.m_tiles[tile_index];
+            }
+        }
+
+        if (tile == nullptr)
+        {
+            continue;
+        }
+
+        const bool blocked = tile->m_blocks_movement;
         const float r = blocked ? 0.62F : 0.18F;
         const float g = blocked ? 0.20F : 0.43F;
         const float b = blocked ? 0.20F : 0.24F;
+        const float width = node->m_world_bounds.m_max.m_x - node->m_world_bounds.m_min.m_x;
+        const float height = node->m_world_bounds.m_max.m_y - node->m_world_bounds.m_min.m_y;
+        const float center_x = node->m_world_bounds.m_min.m_x + width * 0.5F;
+        const float center_y = node->m_world_bounds.m_min.m_y + height * 0.5F;
 
         tiles.push_back(mordor::DebugTile{
-            .m_x = origin_x + (static_cast<float>(tile.m_col) * tile_size),
-            .m_y = origin_y + (static_cast<float>(tile.m_row) * tile_size),
-            .m_width = tile_size - 2.0F,
-            .m_height = tile_size - 2.0F,
+            .m_x = center_x,
+            .m_y = center_y,
+            .m_width = width - 2.0F,
+            .m_height = height - 2.0F,
             .m_r = r,
             .m_g = g,
             .m_b = b,
@@ -98,6 +129,32 @@ std::vector<mordor::DebugTile> build_debug_tiles_from_map(const mordor::DungeonM
     }
 
     return tiles;
+}
+
+mordor::Float3 screen_to_world_point(
+    const mordor::CameraState& camera,
+    int viewport_width,
+    int viewport_height,
+    float screen_x,
+    float screen_y,
+    float world_z)
+{
+    const float dx = screen_x - (static_cast<float>(viewport_width) * 0.5F);
+    const float dy = screen_y - (static_cast<float>(viewport_height) * 0.5F);
+
+    const float c = std::cos(camera.m_rotation_radians);
+    const float s = std::sin(camera.m_rotation_radians);
+
+    const float scaled_x = (dx * c) + (dy * s);
+    const float scaled_y = (-dx * s) + (dy * c);
+
+    const float inv_zoom = camera.m_zoom > 0.0F ? (1.0F / camera.m_zoom) : 1.0F;
+
+    return mordor::Float3{
+        .m_x = camera.m_x + (scaled_x * inv_zoom),
+        .m_y = camera.m_y + (scaled_y * inv_zoom),
+        .m_z = world_z,
+    };
 }
 
 bool try_load_handcrafted_map(
@@ -162,7 +219,31 @@ int main(int argc, char** argv)
         handcrafted_map.m_width,
         handcrafted_map.m_height);
 
-    std::vector<mordor::DebugTile> debug_map = build_debug_tiles_from_map(handcrafted_map);
+    mordor::Scene world_scene{};
+    if (!mordor::build_scene_from_dungeon_map(handcrafted_map, world_scene))
+    {
+        MORDOR_LOG_CRITICAL("Failed to build runtime scene from handcrafted dungeon map");
+        renderer.shutdown();
+        mordor::log::shutdown();
+        return 1;
+    }
+
+    MORDOR_LOG_INFO(
+        "Built runtime scene nodes={} indexed_nodes={} cells={}",
+        world_scene.m_nodes.size(),
+        world_scene.m_spatial_index.m_indexed_node_count,
+        world_scene.m_spatial_index.m_cells.size());
+
+    const mordor::SceneDebugMetrics scene_metrics =
+        mordor::collect_scene_debug_metrics(world_scene);
+    MORDOR_LOG_INFO(
+        "Scene index metrics: cells={} leaf_cells={} max_depth={} indexed_nodes={}",
+        scene_metrics.m_cell_count,
+        scene_metrics.m_leaf_cell_count,
+        scene_metrics.m_max_depth,
+        scene_metrics.m_indexed_node_count);
+
+    std::vector<mordor::DebugTile> debug_map = build_debug_tiles_from_scene(world_scene, handcrafted_map);
 
     mordor::LoopConfig config{};
     config.m_fixed_tick_seconds = 1.0 / 60.0;
@@ -170,7 +251,7 @@ int main(int argc, char** argv)
     config.m_max_run_seconds = 120.0;
 
     mordor::LoopCallbacks callbacks{};
-    callbacks.m_simulate = [&world, &renderer](double dt) {
+    callbacks.m_simulate = [&world, &renderer, &world_scene](double dt) {
         MORDOR_PROFILE_SCOPE("simulate");
         ++world.m_tick_count;
 
@@ -187,6 +268,63 @@ int main(int argc, char** argv)
                 camera.m_y,
                 camera.m_zoom,
                 camera.m_rotation_radians);
+        }
+
+        if (world.m_tick_count % 120 == 0)
+        {
+            constexpr float k_sample_half_extent = 96.0F;
+
+            const auto framebuffer_size = renderer.framebuffer_size();
+            if (framebuffer_size.m_width > 0 && framebuffer_size.m_height > 0)
+            {
+                const float sample_screen_x = 0.5F * static_cast<float>(framebuffer_size.m_width);
+                const float sample_screen_y = 0.5F * static_cast<float>(framebuffer_size.m_height);
+
+                const mordor::CameraState camera = renderer.camera_state();
+                const mordor::Float3 sample_world = screen_to_world_point(
+                    camera,
+                    framebuffer_size.m_width,
+                    framebuffer_size.m_height,
+                    sample_screen_x,
+                    sample_screen_y,
+                    0.0F);
+
+                const uint32_t pickable_flags =
+                    mordor::scene_node_category_bits(mordor::SceneNodeCategory::StaticGeometry)
+                    | mordor::scene_node_category_bits(mordor::SceneNodeCategory::Pickable);
+
+                const std::vector<mordor::SceneNodeId> point_hits =
+                    mordor::query_scene_point(world_scene, sample_world, pickable_flags);
+                const mordor::SceneNodeId picked_id =
+                    mordor::pick_scene_node_at_point(world_scene, sample_world, pickable_flags);
+
+                const mordor::Bounds3 neighborhood{
+                    .m_min = mordor::Float3{
+                        .m_x = sample_world.m_x - k_sample_half_extent,
+                        .m_y = sample_world.m_y - k_sample_half_extent,
+                        .m_z = -1.0F,
+                    },
+                    .m_max = mordor::Float3{
+                        .m_x = sample_world.m_x + k_sample_half_extent,
+                        .m_y = sample_world.m_y + k_sample_half_extent,
+                        .m_z = 1.0F,
+                    },
+                };
+                const std::vector<mordor::SceneNodeId> neighborhood_hits =
+                    mordor::query_scene_bounds(world_scene, neighborhood);
+
+                MORDOR_LOG_DEBUG(
+                    "scene_query tick={} framebuffer=({}x{}) sample_world=({}, {}, {}) point_hits={} picked={} neighborhood_hits={}",
+                    world.m_tick_count,
+                    framebuffer_size.m_width,
+                    framebuffer_size.m_height,
+                    sample_world.m_x,
+                    sample_world.m_y,
+                    sample_world.m_z,
+                    point_hits.size(),
+                    picked_id,
+                    neighborhood_hits.size());
+            }
         }
     };
     callbacks.m_render = [&renderer, &debug_map](double alpha) {
