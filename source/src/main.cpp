@@ -114,10 +114,12 @@ std::vector<mordor::DebugTile> build_debug_tiles_from_scene(
         const float b = blocked ? 0.20F : 0.24F;
         const float width = node->m_world_bounds.m_max.m_x - node->m_world_bounds.m_min.m_x;
         const float height = node->m_world_bounds.m_max.m_y - node->m_world_bounds.m_min.m_y;
+        const float center_x = node->m_world_bounds.m_min.m_x + width * 0.5F;
+        const float center_y = node->m_world_bounds.m_min.m_y + height * 0.5F;
 
         tiles.push_back(mordor::DebugTile{
-            .m_x = node->m_world_position.m_x,
-            .m_y = node->m_world_position.m_y,
+            .m_x = center_x,
+            .m_y = center_y,
             .m_width = width - 2.0F,
             .m_height = height - 2.0F,
             .m_r = r,
