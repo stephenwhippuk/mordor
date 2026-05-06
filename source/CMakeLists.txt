@@ -168,4 +168,30 @@ else()
     )
 endif()
 
+if(BUILD_TESTING)
+    add_executable(mordor_unit_tests
+        tests/unit_tests.cpp
+        src/components.cpp
+        src/interactions.cpp
+        src/key_switch.cpp
+        src/occupancy.cpp
+    )
+
+    target_include_directories(mordor_unit_tests
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+
+    if(MSVC)
+        target_compile_options(mordor_unit_tests PRIVATE /W4 /WX)
+    else()
+        target_compile_options(mordor_unit_tests PRIVATE
+            -Wall -Wextra -Wpedantic -Wconversion -Wshadow
+            $<$<CONFIG:Release>:-O2>
+        )
+    endif()
+
+    add_test(NAME mordor_unit_tests COMMAND mordor_unit_tests)
+endif()
+
 install(TARGETS mordor RUNTIME DESTINATION bin)
