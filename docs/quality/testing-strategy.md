@@ -54,3 +54,8 @@ Expected value:
 2. Run property/fuzz and performance suites on scheduled jobs.
 3. Block merges on failed deterministic simulation tests.
 4. Keep test fixtures versioned with schema changes.
+
+## Current Baseline
+1. Unit test target: `mordor_unit_tests`.
+2. Run command: `ctest --test-dir build --output-on-failure`.
+3. Initial coverage: interaction state transitions, key/switch link behavior, and occupancy/blocking invariants.
