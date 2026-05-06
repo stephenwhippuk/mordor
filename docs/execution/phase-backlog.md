@@ -47,7 +47,7 @@ Must be resolved before rotation is considered production-quality. Tracked for P
 | Task ID | Description | Depends On | Priority | Status | Deliverable Link |
 |---|---|---|---|---|---|
 | P2-01 | Define actor and interactable component schema | P1-06 | High | Complete | architecture/world-scene-structure.md |
-| P2-02 | Implement interaction state machines (door/chest/trap) | P2-01 | High | Not Started | plan/development-phases.md |
+| P2-02 | Implement interaction state machines (door/chest/trap) | P2-01 | High | Complete | plan/development-phases.md |
 | P2-03 | Implement key and switch logic model | P2-02 | High | Not Started | plan/basic-engine-release.md |
 | P2-04 | Implement blocking and occupancy rules | P1-06, P2-01 | Medium | Not Started | architecture/world-scene-structure.md |
 
