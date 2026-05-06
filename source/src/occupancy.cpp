@@ -183,7 +183,10 @@ bool apply_interactable_blocking_to_grid(
 
         const bool blocks = interactable_blocks_movement(interactable);
         const std::size_t idx = tile_index(grid, col, row);
-        const uint8_t new_value = blocks ? 1U : 0U;
+
+        // Keep blocking monotonic inside this pass so iteration order cannot
+        // clear a blocked tile when multiple interactables share one cell.
+        const uint8_t new_value = (grid.m_dynamic_blocking[idx] != 0U || blocks) ? 1U : 0U;
         if (grid.m_dynamic_blocking[idx] != new_value)
         {
             grid.m_dynamic_blocking[idx] = new_value;
