@@ -1,18 +1,17 @@
 # Immediate Next Steps (2-3 Weeks)
 
 ## Goal
-Turn the completed Phase 2 simulation baseline into the first usable perception stack for Phase 3.
+Extend the newly established Phase 3 LOS baseline into a usable multi-sense perception stack.
 
 ## Work Items
-1. Implement line-of-sight and occlusion checks over the current occupancy and scene-query structures.
-2. Add directional hearing event primitives tied to simulation-side events.
-3. Build explored-versus-visible fog-of-war state.
-4. Add debug overlays for LOS rays, audible events, and visible/explored cells.
-5. Expand the unit-test suite to cover occupancy, interaction sequences, and first perception invariants.
+1. Add directional hearing event primitives tied to simulation-side events.
+2. Build explored-versus-visible fog-of-war state.
+3. Add debug overlays for LOS rays, audible events, and visible/explored cells.
+4. Expand the unit-test suite to cover perception invariants across LOS, hearing, and fog-of-war state transitions.
 
 ## Success Criteria
-1. Perception queries consume current simulation blocking and occupancy state rather than ad hoc debug logic.
-2. The renderer can visualize visible/explored state and LOS debug information from simulation-owned results.
+1. LOS, hearing, and fog-of-war queries consume simulation-owned blocking and occupancy state rather than ad hoc debug logic.
+2. The renderer can visualize visible/explored state and perception debug information from simulation-owned results.
 3. New perception and interaction regressions are covered by runnable automated tests.
 
 ## Follow-On
