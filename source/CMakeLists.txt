@@ -172,6 +172,7 @@ if(BUILD_TESTING)
     add_executable(mordor_unit_tests
         tests/unit_tests.cpp
         src/components.cpp
+        src/hearing.cpp
         src/interactions.cpp
         src/key_switch.cpp
         src/occupancy.cpp

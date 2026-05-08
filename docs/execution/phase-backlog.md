@@ -57,7 +57,7 @@ Must be resolved before rotation is considered production-quality. Tracked for P
 | Task ID | Description | Depends On | Priority | Status | Deliverable Link |
 |---|---|---|---|---|---|
 | P3-01 | Implement line-of-sight and occlusion checks | P2-04 | High | Complete | plan/development-phases.md |
-| P3-02 | Add directional hearing event system | P2-01 | Medium | Not Started | architecture/engine-architecture.md |
+| P3-02 | Add directional hearing event system | P2-01 | Medium | Complete | architecture/engine-architecture.md |
 | P3-03 | Build fog-of-war explored and visible map state | P3-01 | High | Not Started | plan/basic-engine-release.md |
 | P3-04 | Add perception debug overlays | P3-01, P3-02, P3-03 | Medium | Not Started | quality/testing-strategy.md |
 

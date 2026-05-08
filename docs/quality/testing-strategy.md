@@ -58,4 +58,4 @@ Expected value:
 ## Current Baseline
 1. Unit test target: `mordor_unit_tests`.
 2. Run command: `ctest --test-dir build --output-on-failure`.
-3. Current coverage: interaction state transitions, key/switch link behavior, occupancy/blocking invariants, and baseline line-of-sight/occlusion checks.
+3. Current coverage: interaction state transitions, key/switch link behavior, occupancy/blocking invariants, baseline line-of-sight/occlusion checks, and directional hearing invariants.
