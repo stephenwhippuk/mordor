@@ -5,6 +5,7 @@
 #include "mordor/key_switch.hpp"
 #include "mordor/map.hpp"
 #include "mordor/occupancy.hpp"
+#include "mordor/perception_debug.hpp"
 #include "mordor/scene.hpp"
 #include "mordor/visibility.hpp"
 
@@ -326,6 +327,52 @@ void test_fog_of_war_rules()
     check(is_fog_explored(fog, 0, 1), "previously seen tile should remain explored after visibility clears");
 }
 
+void test_perception_debug_overlay_rules()
+{
+    const DungeonMap map = build_test_map();
+    OccupancyGrid grid{};
+    check(build_occupancy_grid_from_map(map, grid), "occupancy grid build for debug overlays should succeed");
+
+    FogOfWarState fog{};
+    check(build_fog_of_war_state(grid, fog), "fog state build for debug overlays should succeed");
+    const std::vector<FogOfWarObserver> observers{FogOfWarObserver{
+        .m_tile = TileCoord{.m_col = 0, .m_row = 0},
+        .m_vision_range_tiles = 3,
+    }};
+    check(refresh_fog_of_war(fog, grid, observers), "fog refresh for debug overlays should succeed");
+
+    std::vector<DebugTile> overlays{};
+    const std::size_t fog_count = append_fog_of_war_debug_tiles(fog, overlays);
+    check(fog_count > 0, "fog debug overlay should add tiles");
+
+    const LineOfSightResult los =
+        trace_line_of_sight(grid, TileCoord{.m_col = 0, .m_row = 0}, TileCoord{.m_col = 2, .m_row = 0});
+    const std::size_t los_count = append_line_of_sight_debug_tiles(los, overlays);
+    check(los_count >= los.m_traversed_tiles.size(), "los overlay should include traced path tiles");
+
+    const std::vector<TileCoord> line = build_tile_line(TileCoord{.m_col = 0, .m_row = 0}, TileCoord{.m_col = 2, .m_row = 1});
+    check(!line.empty(), "tile-line helper should generate line points");
+    check(line.front().m_col == 0 && line.front().m_row == 0, "tile-line should include start");
+    check(line.back().m_col == 2 && line.back().m_row == 1, "tile-line should include end");
+
+    const HearingEvent event{
+        .m_kind = HearingEventKind::Movement,
+        .m_source_tile = TileCoord{.m_col = 2, .m_row = 1},
+        .m_loudness = 1.0F,
+        .m_max_range_tiles = 4.0F,
+    };
+    const HearingListener listener{
+        .m_listener_tile = TileCoord{.m_col = 0, .m_row = 0},
+        .m_forward = Float3{.m_x = 1.0F, .m_y = 0.0F, .m_z = 0.0F},
+        .m_rear_gain = 0.35F,
+        .m_detection_threshold = 0.05F,
+    };
+    const HearingResult hearing = evaluate_hearing_event(grid, event, listener);
+    const std::size_t hearing_count =
+        append_hearing_debug_tiles(listener.m_listener_tile, event, hearing, line, overlays);
+    check(hearing_count >= line.size() + 2U, "hearing overlay should include path plus listener/source markers");
+}
+
 } // namespace
 
 int main()
@@ -338,6 +385,7 @@ int main()
         test_line_of_sight_rules();
         test_directional_hearing_rules();
         test_fog_of_war_rules();
+        test_perception_debug_overlay_rules();
     }
     catch (const std::exception& ex)
     {

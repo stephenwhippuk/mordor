@@ -58,6 +58,7 @@ Current baseline:
 3. Temporary debug map draw path implemented as scissor-constrained clear regions until shader/VBO pipeline lands.
 4. Camera movement consumes input actions from the platform input binding layer rather than hard-coded key checks.
 5. A handcrafted dungeon test map is loaded from an ASCII asset and rendered with collision-state debug overlays.
+6. Perception debug overlays now render LOS rays, hearing event traces, and fog visible/explored cells from simulation-owned query outputs.
 
 Ordering note:
 1. Ship stable world rendering before advanced visual effects.
@@ -87,6 +88,7 @@ Current baseline:
 5. Deterministic visibility unit tests now cover clear, blocked, blocked-target, and blocked-corner LOS cases.
 6. Directional hearing primitives evaluate audibility from source/listener tiles with deterministic distance falloff, facing bias, and occupancy-based occlusion attenuation.
 7. Fog-of-war state now tracks visible versus explored cells and refreshes visibility from observer tiles using LOS-gated simulation queries.
+8. Perception debug-tile builders produce deterministic overlay payloads that map LOS, hearing, and fog results into renderer-consumable debug geometry.
 
 Ordering note:
 1. Deterministic behavior is a hard requirement for reliable testing.
