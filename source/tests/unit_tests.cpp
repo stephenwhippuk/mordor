@@ -1,3 +1,4 @@
+#include "mordor/ability_pipeline.hpp"
 #include "mordor/components.hpp"
 #include "mordor/fog_of_war.hpp"
 #include "mordor/hearing.hpp"
@@ -491,6 +492,236 @@ void test_party_selection_and_command_rules()
         "issuing with no selection should be rejected");
 }
 
+void test_ability_pipeline_rules()
+{
+    RuntimeComponents components{};
+
+    const EntityId caster = allocate_entity(components);
+    const EntityId target_actor = allocate_entity(components);
+
+    components.m_actors.push_back(ActorComponent{
+        .m_entity_id = caster,
+        .m_archetype_id = 10U,
+        .m_max_action_points = 3U,
+        .m_current_action_points = 3U,
+        .m_move_speed_units_per_second = 3.0F,
+        .m_allegiance = Allegiance::Friendly,
+    });
+    components.m_actors.push_back(ActorComponent{
+        .m_entity_id = target_actor,
+        .m_archetype_id = 11U,
+        .m_max_action_points = 2U,
+        .m_current_action_points = 2U,
+        .m_move_speed_units_per_second = 3.0F,
+        .m_allegiance = Allegiance::Hostile,
+    });
+
+    components.m_transforms.push_back(TransformComponent{
+        .m_entity_id = caster,
+        .m_scene_node_id = k_invalid_scene_node_id,
+        .m_local_offset = Float3{.m_x = 0.0F, .m_y = 0.0F, .m_z = 0.0F},
+    });
+    components.m_transforms.push_back(TransformComponent{
+        .m_entity_id = target_actor,
+        .m_scene_node_id = k_invalid_scene_node_id,
+        .m_local_offset = Float3{.m_x = k_scene_tile_world_size, .m_y = 0.0F, .m_z = 0.0F},
+    });
+
+    OccupancyGrid grid{};
+    check(build_occupancy_grid_from_map(build_test_map(), grid), "ability test occupancy build should succeed");
+    check(set_tile_occupant(grid, 1, 1, target_actor), "ability test should place occupant on target tile");
+
+    const std::vector<AbilitySpec> specs{
+        AbilitySpec{
+            .m_ability_id = 100U,
+            .m_target_kind = AbilityTargetKind::Entity,
+            .m_action_point_cost = 1U,
+            .m_max_range_tiles = 4U,
+            .m_allow_empty_tile_target = false,
+        },
+        AbilitySpec{
+            .m_ability_id = 101U,
+            .m_target_kind = AbilityTargetKind::Tile,
+            .m_action_point_cost = 1U,
+            .m_max_range_tiles = 4U,
+            .m_allow_empty_tile_target = false,
+        },
+        AbilitySpec{
+            .m_ability_id = 102U,
+            .m_target_kind = AbilityTargetKind::Tile,
+            .m_action_point_cost = 1U,
+            .m_max_range_tiles = 4U,
+            .m_allow_empty_tile_target = true,
+        },
+        AbilitySpec{
+            .m_ability_id = 103U,
+            .m_target_kind = AbilityTargetKind::None,
+            .m_action_point_cost = 1U,
+            .m_max_range_tiles = 0U,
+            .m_allow_empty_tile_target = false,
+        },
+        AbilitySpec{
+            .m_ability_id = 104U,
+            .m_target_kind = AbilityTargetKind::Entity,
+            .m_action_point_cost = 1U,
+            .m_max_range_tiles = 0U,
+            .m_allow_empty_tile_target = false,
+        },
+        AbilitySpec{
+            .m_ability_id = 105U,
+            .m_target_kind = AbilityTargetKind::Entity,
+            .m_action_point_cost = 5U,
+            .m_max_range_tiles = 4U,
+            .m_allow_empty_tile_target = false,
+        },
+    };
+
+    AbilityExecutionQueue queue{};
+
+    const AbilityRequest unknown_ability{
+        .m_issuer_entity_id = caster,
+        .m_ability_id = 999U,
+        .m_target_entity_id = target_actor,
+    };
+    check(
+        issue_ability_request(components, grid, specs, unknown_ability, queue).m_status
+            == AbilityIssueStatus::RejectedUnknownAbility,
+        "unknown ability id should be rejected");
+
+    const AbilityRequest missing_target_entity{
+        .m_issuer_entity_id = caster,
+        .m_ability_id = 100U,
+        .m_target_entity_id = 5555U,
+    };
+    check(
+        issue_ability_request(components, grid, specs, missing_target_entity, queue).m_status
+            == AbilityIssueStatus::RejectedTargetEntityNotFound,
+        "entity-targeted ability should reject missing target entity");
+
+    const AbilityRequest mixed_entity_and_tile_target{
+        .m_issuer_entity_id = caster,
+        .m_ability_id = 100U,
+        .m_target_entity_id = target_actor,
+        .m_target_tile = TileCoord{.m_col = 2, .m_row = 1},
+    };
+    check(
+        issue_ability_request(components, grid, specs, mixed_entity_and_tile_target, queue).m_status
+            == AbilityIssueStatus::RejectedInvalidTarget,
+        "entity-targeted ability should reject mixed entity and tile target fields");
+
+    const AbilityRequest entity_ok{
+        .m_issuer_entity_id = caster,
+        .m_ability_id = 100U,
+        .m_target_entity_id = target_actor,
+    };
+    check(
+        issue_ability_request(components, grid, specs, entity_ok, queue).m_status
+            == AbilityIssueStatus::Accepted,
+        "entity-targeted ability should accept existing in-range target");
+
+    const AbilityRequest tile_needs_occupied_but_empty{
+        .m_issuer_entity_id = caster,
+        .m_ability_id = 101U,
+        .m_target_tile = TileCoord{.m_col = 2, .m_row = 1},
+    };
+    check(
+        issue_ability_request(components, grid, specs, tile_needs_occupied_but_empty, queue).m_status
+            == AbilityIssueStatus::RejectedInvalidTarget,
+        "tile-target ability without empty-tile support should reject empty tiles");
+
+    const AbilityRequest mixed_tile_and_entity_target{
+        .m_issuer_entity_id = caster,
+        .m_ability_id = 101U,
+        .m_target_entity_id = target_actor,
+        .m_target_tile = TileCoord{.m_col = 1, .m_row = 1},
+    };
+    check(
+        issue_ability_request(components, grid, specs, mixed_tile_and_entity_target, queue).m_status
+            == AbilityIssueStatus::RejectedInvalidTarget,
+        "tile-target ability should reject mixed entity and tile target fields");
+
+    const AbilityRequest tile_needs_occupied_ok{
+        .m_issuer_entity_id = caster,
+        .m_ability_id = 101U,
+        .m_target_tile = TileCoord{.m_col = 1, .m_row = 1},
+    };
+    check(
+        issue_ability_request(components, grid, specs, tile_needs_occupied_ok, queue).m_status
+            == AbilityIssueStatus::Accepted,
+        "tile-target ability should accept occupied tile when empty-tile targeting is disabled");
+
+    const AbilityRequest tile_empty_allowed{
+        .m_issuer_entity_id = caster,
+        .m_ability_id = 102U,
+        .m_target_tile = TileCoord{.m_col = 2, .m_row = 1},
+    };
+    check(
+        issue_ability_request(components, grid, specs, tile_empty_allowed, queue).m_status
+            == AbilityIssueStatus::Accepted,
+        "tile-target ability with empty-tile support should accept empty tiles");
+
+    const AbilityRequest none_with_target{
+        .m_issuer_entity_id = caster,
+        .m_ability_id = 103U,
+        .m_target_entity_id = target_actor,
+    };
+    check(
+        issue_ability_request(components, grid, specs, none_with_target, queue).m_status
+            == AbilityIssueStatus::RejectedInvalidTarget,
+        "none-target ability should reject non-empty target fields");
+
+    const AbilityRequest none_ok{
+        .m_issuer_entity_id = caster,
+        .m_ability_id = 103U,
+    };
+    check(
+        issue_ability_request(components, grid, specs, none_ok, queue).m_status
+            == AbilityIssueStatus::Accepted,
+        "none-target ability should accept default empty target fields");
+
+    const AbilityRequest out_of_range_entity{
+        .m_issuer_entity_id = caster,
+        .m_ability_id = 104U,
+        .m_target_entity_id = target_actor,
+    };
+    check(
+        issue_ability_request(components, grid, specs, out_of_range_entity, queue).m_status
+            == AbilityIssueStatus::RejectedOutOfRange,
+        "entity-targeted ability should reject out-of-range target");
+
+    const AbilityRequest insufficient_ap{
+        .m_issuer_entity_id = caster,
+        .m_ability_id = 105U,
+        .m_target_entity_id = target_actor,
+    };
+    check(
+        issue_ability_request(components, grid, specs, insufficient_ap, queue).m_status
+            == AbilityIssueStatus::RejectedInsufficientActionPoints,
+        "ability should reject issuer with insufficient action points");
+
+    AbilityExecutionQueue full_queue{};
+    full_queue.m_max_size = 1U;
+    const AbilityRequest queue_seed{
+        .m_issuer_entity_id = caster,
+        .m_ability_id = 100U,
+        .m_target_entity_id = target_actor,
+    };
+    const AbilityRequest queue_overflow{
+        .m_issuer_entity_id = caster,
+        .m_ability_id = 100U,
+        .m_target_entity_id = target_actor,
+    };
+
+    check(
+        issue_ability_request(components, grid, specs, queue_seed, full_queue).m_status
+            == AbilityIssueStatus::Accepted,
+        "queue seed request should be accepted");
+    check(
+        issue_ability_request(components, grid, specs, queue_overflow, full_queue).m_status
+            == AbilityIssueStatus::RejectedQueueFull,
+        "ability request should reject when execution queue is full");
+}
+
 } // namespace
 
 int main()
@@ -505,6 +736,7 @@ int main()
         test_fog_of_war_rules();
         test_perception_debug_overlay_rules();
         test_party_selection_and_command_rules();
+        test_ability_pipeline_rules();
     }
     catch (const std::exception& ex)
     {

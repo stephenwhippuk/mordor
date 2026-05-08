@@ -104,6 +104,7 @@ Current baseline:
 1. Deterministic state machines exist for door, chest/container, trap, and switch interactions.
 2. Key ownership, unlock checks, and switch-to-target linkage rules are implemented.
 3. Party selection and command issuing now flow through an abstract, deterministic command-intent layer, leaving game-specific resolution details for later phases.
+4. Ability requests now pass through an abstract validation-and-queue pipeline with explicit target-kind rules (none/entity/tile), action-point gating, and range checks.
 
 Ordering note:
 1. Stabilize rule contracts early to reduce UI and AI churn.
