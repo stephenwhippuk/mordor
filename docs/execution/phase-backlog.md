@@ -74,28 +74,38 @@ Must be resolved before rotation is considered production-quality. Tracked for P
 
 | Task ID | Description | Depends On | Priority | Status | Deliverable Link |
 |---|---|---|---|---|---|
-| P5-01 | Implement room/corridor generation algorithm | P4-02 | High | Not Started | plan/development-phases.md |
-| P5-02 | Add key-lock and switch-door generator constraints | P5-01 | High | Not Started | research/research-tracks.md |
-| P5-03 | Add prefab insertion support for complex scenes | P5-01 | Medium | Not Started | research/research-tracks.md |
-| P5-04 | Build validation pass for reachability and solvability | P5-01, P5-02 | High | Not Started | quality/testing-strategy.md |
+| P5-01 | Implement shader/VBO world rendering for map walls and floors | P1-05, P1-07 | High | Not Started | plan/rendering-engine-plan.md |
+| P5-02 | Implement tunable isometric-perspective camera rig | P1-03, P5-01 | High | Not Started | plan/rendering-engine-plan.md |
+| P5-03 | Implement mouse-driven tile/entity selection and picking | P1-08, P5-01 | High | Not Started | plan/rendering-engine-plan.md |
+| P5-04 | Implement occlusion-aware wall fade/hide for interaction readability | P3-01, P5-02, P5-03 | High | Not Started | plan/rendering-engine-plan.md |
+| P5-05 | Add frustum culling and render submission metrics | P1-08, P5-01 | Medium | Not Started | plan/rendering-engine-plan.md |
 
 ## Phase 6 Backlog
 
 | Task ID | Description | Depends On | Priority | Status | Deliverable Link |
 |---|---|---|---|---|---|
-| P6-01 | Create scripted NPC behavior interface | P4-02 | High | Not Started | plan/development-phases.md |
-| P6-02 | Implement investigate and patrol behavior | P6-01, P3-02 | Medium | Not Started | plan/development-phases.md |
-| P6-03 | Implement chase and disengage behavior | P6-01, P3-01 | Medium | Not Started | plan/development-phases.md |
-| P6-04 | Expand encounter and item content sets | P6-02, P6-03 | Medium | Not Started | plan/basic-engine-release.md |
+| P6-01 | Implement room/corridor generation algorithm | P5-01 | High | Not Started | plan/development-phases.md |
+| P6-02 | Add key-lock and switch-door generator constraints | P6-01 | High | Not Started | research/research-tracks.md |
+| P6-03 | Add prefab insertion support for complex scenes | P6-01 | Medium | Not Started | research/research-tracks.md |
+| P6-04 | Build validation pass for reachability and solvability | P6-01, P6-02 | High | Not Started | quality/testing-strategy.md |
 
 ## Phase 7 Backlog
 
 | Task ID | Description | Depends On | Priority | Status | Deliverable Link |
 |---|---|---|---|---|---|
-| P7-01 | Implement content validators and authoring helpers | P5-04 | Medium | Not Started | plan/development-phases.md |
-| P7-02 | Implement robust save/load and migration checks | P4-03 | High | Not Started | quality/testing-strategy.md |
-| P7-03 | Establish performance budget checks and profiling runs | P1-01 | High | Not Started | quality/testing-strategy.md |
-| P7-04 | Build regression suite and release candidate checklist | P7-01, P7-02, P7-03 | High | Not Started | plan/basic-engine-release.md |
+| P7-01 | Create scripted NPC behavior interface | P4-02 | High | Not Started | plan/development-phases.md |
+| P7-02 | Implement investigate and patrol behavior | P7-01, P3-02 | Medium | Not Started | plan/development-phases.md |
+| P7-03 | Implement chase and disengage behavior | P7-01, P3-01 | Medium | Not Started | plan/development-phases.md |
+| P7-04 | Expand encounter and item content sets | P7-02, P7-03 | Medium | Not Started | plan/basic-engine-release.md |
+
+## Phase 8 Backlog
+
+| Task ID | Description | Depends On | Priority | Status | Deliverable Link |
+|---|---|---|---|---|---|
+| P8-01 | Implement content validators and authoring helpers | P6-04 | Medium | Not Started | plan/development-phases.md |
+| P8-02 | Implement robust save/load and migration checks | P4-03 | High | Not Started | quality/testing-strategy.md |
+| P8-03 | Establish performance budget checks and profiling runs | P1-01 | High | Not Started | quality/testing-strategy.md |
+| P8-04 | Build regression suite and release candidate checklist | P8-01, P8-02, P8-03 | High | Not Started | plan/basic-engine-release.md |
 
 ## Dependency Rules
 1. Do not start High priority tasks with unresolved High dependencies.
