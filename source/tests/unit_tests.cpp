@@ -1,4 +1,5 @@
 #include "mordor/components.hpp"
+#include "mordor/fog_of_war.hpp"
 #include "mordor/hearing.hpp"
 #include "mordor/interactions.hpp"
 #include "mordor/key_switch.hpp"
@@ -298,6 +299,33 @@ void test_directional_hearing_rules()
     check(!out_of_range_result.m_audible, "out-of-range hearing event should not be audible");
 }
 
+void test_fog_of_war_rules()
+{
+    const DungeonMap map = build_test_map();
+    OccupancyGrid grid{};
+    check(build_occupancy_grid_from_map(map, grid), "occupancy grid build for fog should succeed");
+
+    FogOfWarState fog{};
+    check(build_fog_of_war_state(grid, fog), "fog state build should succeed");
+
+    std::vector<FogOfWarObserver> observers{FogOfWarObserver{
+        .m_tile = TileCoord{.m_col = 0, .m_row = 0},
+        .m_vision_range_tiles = 3,
+    }};
+    check(refresh_fog_of_war(fog, grid, observers), "fog refresh should succeed");
+
+    check(is_fog_visible(fog, 0, 0), "observer tile should be visible");
+    check(is_fog_visible(fog, 0, 1), "near clear tile should be visible");
+    check(!is_fog_visible(fog, 2, 0), "wall-occluded tile should not be visible");
+    check(is_fog_explored(fog, 0, 1), "visible tile should be marked explored");
+
+    observers[0].m_tile = TileCoord{.m_col = 2, .m_row = 1};
+    observers[0].m_vision_range_tiles = 1;
+    check(refresh_fog_of_war(fog, grid, observers), "fog refresh after move should succeed");
+    check(!is_fog_visible(fog, 0, 1), "previously visible tile should not remain visible after observer move");
+    check(is_fog_explored(fog, 0, 1), "previously seen tile should remain explored after visibility clears");
+}
+
 } // namespace
 
 int main()
@@ -309,6 +337,7 @@ int main()
         test_occupancy_rules();
         test_line_of_sight_rules();
         test_directional_hearing_rules();
+        test_fog_of_war_rules();
     }
     catch (const std::exception& ex)
     {

@@ -1,12 +1,11 @@
 # Immediate Next Steps (2-3 Weeks)
 
 ## Goal
-Extend the newly established Phase 3 LOS baseline into a usable multi-sense perception stack.
+Finalize the remaining perception deliverables and expose them through debug rendering workflows.
 
 ## Work Items
-1. Build explored-versus-visible fog-of-war state.
-2. Add debug overlays for LOS rays, audible events, and visible/explored cells.
-3. Expand the unit-test suite to cover perception invariants across LOS, hearing, and fog-of-war state transitions.
+1. Add debug overlays for LOS rays, audible events, and visible/explored cells.
+2. Expand the unit-test suite to cover richer perception invariants across LOS, hearing, and fog-of-war state transitions.
 
 ## Success Criteria
 1. LOS, hearing, and fog-of-war queries consume simulation-owned blocking and occupancy state rather than ad hoc debug logic.

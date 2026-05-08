@@ -86,6 +86,7 @@ Current baseline:
 4. Baseline line-of-sight and occlusion queries are implemented over simulation-owned occupancy state, including blocked-target and blocked-corner handling.
 5. Deterministic visibility unit tests now cover clear, blocked, blocked-target, and blocked-corner LOS cases.
 6. Directional hearing primitives evaluate audibility from source/listener tiles with deterministic distance falloff, facing bias, and occupancy-based occlusion attenuation.
+7. Fog-of-war state now tracks visible versus explored cells and refreshes visibility from observer tiles using LOS-gated simulation queries.
 
 Ordering note:
 1. Deterministic behavior is a hard requirement for reliable testing.
