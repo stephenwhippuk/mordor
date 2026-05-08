@@ -1,21 +1,19 @@
 # Immediate Next Steps (2-3 Weeks)
 
 ## Goal
-Turn the rendered sandbox into a scene-aware runtime that is ready for Phase 2 interaction work.
+Turn the completed Phase 2 simulation baseline into the first usable perception stack for Phase 3.
 
 ## Work Items
-1. Implement scene-graph storage and stable `scene_node_id` allocation.
-2. Add loose-octree broadphase support for scene bounds, clipping candidates, and picking candidates.
-3. Extend map loading to emit both simulation cell data and scene-node construction data.
-4. Define actor and interactable schemas against scene-node attachment points.
-5. Implement blocking and occupancy rules over simulation-owned spatial records.
-6. Add debug views for scene bounds, octree population, and picking diagnostics.
-7. Implement first interaction state machines (door/chest/trap).
+1. Implement line-of-sight and occlusion checks over the current occupancy and scene-query structures.
+2. Add directional hearing event primitives tied to simulation-side events.
+3. Build explored-versus-visible fog-of-war state.
+4. Add debug overlays for LOS rays, audible events, and visible/explored cells.
+5. Expand the unit-test suite to cover occupancy, interaction sequences, and first perception invariants.
 
 ## Success Criteria
-1. The handcrafted dungeon loads into both scene-query structures and simulation spatial records from one authored asset.
-2. Picking and clipping can query stable scene nodes without brute-force world scans.
-3. Actor and interactable work can begin without redefining world attachment or occupancy ownership.
+1. Perception queries consume current simulation blocking and occupancy state rather than ad hoc debug logic.
+2. The renderer can visualize visible/explored state and LOS debug information from simulation-owned results.
+3. New perception and interaction regressions are covered by runnable automated tests.
 
 ## Follow-On
-1. Start Phase 2 actor/interactable implementation once the above runtime scaffolding is in place.
+1. Start party command and ability pipeline work once perception results can drive targeting and visibility.

@@ -36,6 +36,10 @@ Responsibilities:
 3. Resource handles and lifetime ownership.
 4. Event system for low-coupling communication.
 
+Current baseline:
+1. Lightweight entity/component storage is in place for actors, interactables, transforms, colliders, inventories, keyrings, switch links, and occupancy data.
+2. A CTest-backed unit-test target covers deterministic interaction, key/switch, and occupancy invariants.
+
 Implementation direction:
 1. Use a simple entity-component model first.
 2. Favor data-driven configuration over hard-coded behavior.
@@ -75,6 +79,11 @@ Responsibilities:
 4. Fog-of-war state management.
 5. Authoritative blocking and occupancy state separate from renderer-oriented scene hierarchy.
 
+Current baseline:
+1. Simulation-owned occupancy grid derives static blocking from the handcrafted map.
+2. Dynamic blocking is applied from interactable state.
+3. Actor occupancy is tracked separately from blocking and can be queried per tile.
+
 Ordering note:
 1. Deterministic behavior is a hard requirement for reliable testing.
 
@@ -84,6 +93,10 @@ Responsibilities:
 2. Character ability driven action resolution.
 3. Inventory operations and item usage semantics.
 4. Party control model for group and individual commands.
+
+Current baseline:
+1. Deterministic state machines exist for door, chest/container, trap, and switch interactions.
+2. Key ownership, unlock checks, and switch-to-target linkage rules are implemented.
 
 Ordering note:
 1. Stabilize rule contracts early to reduce UI and AI churn.
