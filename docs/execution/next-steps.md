@@ -4,10 +4,9 @@
 Extend the newly established Phase 3 LOS baseline into a usable multi-sense perception stack.
 
 ## Work Items
-1. Add directional hearing event primitives tied to simulation-side events.
-2. Build explored-versus-visible fog-of-war state.
-3. Add debug overlays for LOS rays, audible events, and visible/explored cells.
-4. Expand the unit-test suite to cover perception invariants across LOS, hearing, and fog-of-war state transitions.
+1. Build explored-versus-visible fog-of-war state.
+2. Add debug overlays for LOS rays, audible events, and visible/explored cells.
+3. Expand the unit-test suite to cover perception invariants across LOS, hearing, and fog-of-war state transitions.
 
 ## Success Criteria
 1. LOS, hearing, and fog-of-war queries consume simulation-owned blocking and occupancy state rather than ad hoc debug logic.

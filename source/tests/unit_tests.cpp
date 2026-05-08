@@ -1,4 +1,5 @@
 #include "mordor/components.hpp"
+#include "mordor/hearing.hpp"
 #include "mordor/interactions.hpp"
 #include "mordor/key_switch.hpp"
 #include "mordor/map.hpp"
@@ -6,6 +7,7 @@
 #include "mordor/scene.hpp"
 #include "mordor/visibility.hpp"
 
+#include <cmath>
 #include <cstdlib>
 #include <exception>
 #include <iostream>
@@ -24,6 +26,11 @@ void check(bool condition, const std::string& message)
         g_all_ok = false;
         std::cerr << "[FAIL] " << message << '\n';
     }
+}
+
+void check_near(float expected, float actual, float epsilon, const std::string& message)
+{
+    check(std::fabs(expected - actual) <= epsilon, message);
 }
 
 DungeonMap build_test_map()
@@ -213,6 +220,84 @@ void test_line_of_sight_rules()
         "blocked corner should report one of the blocking edge tiles");
 }
 
+void test_directional_hearing_rules()
+{
+    const DungeonMap map = build_test_map();
+    OccupancyGrid grid{};
+    check(build_occupancy_grid_from_map(map, grid), "occupancy grid build for hearing should succeed");
+
+    const HearingEvent event_front{
+        .m_kind = HearingEventKind::Movement,
+        .m_source_tile = TileCoord{.m_col = 2, .m_row = 1},
+        .m_loudness = 1.0F,
+        .m_max_range_tiles = 4.0F,
+    };
+
+    const HearingListener facing_source{
+        .m_listener_tile = TileCoord{.m_col = 0, .m_row = 1},
+        .m_forward = Float3{.m_x = 1.0F, .m_y = 0.0F, .m_z = 0.0F},
+        .m_rear_gain = 0.35F,
+        .m_detection_threshold = 0.05F,
+    };
+    const HearingListener facing_away{
+        .m_listener_tile = TileCoord{.m_col = 0, .m_row = 1},
+        .m_forward = Float3{.m_x = -1.0F, .m_y = 0.0F, .m_z = 0.0F},
+        .m_rear_gain = 0.35F,
+        .m_detection_threshold = 0.05F,
+    };
+
+    const HearingResult front_result = evaluate_hearing_event(grid, event_front, facing_source);
+    const HearingResult back_result = evaluate_hearing_event(grid, event_front, facing_away);
+    check(front_result.m_audible, "front hearing result should be audible");
+    check(back_result.m_audible, "rear hearing result should remain audible with baseline rear gain");
+    check(
+        front_result.m_perceived_loudness > back_result.m_perceived_loudness,
+        "facing source should increase perceived loudness");
+    check(front_result.m_directional_alignment > back_result.m_directional_alignment, "alignment should reflect facing");
+    check_near(2.0F, front_result.m_distance_tiles, 0.0001F, "distance should match tile separation");
+
+    const HearingEvent blocked_event{
+        .m_kind = HearingEventKind::Interaction,
+        .m_source_tile = TileCoord{.m_col = 2, .m_row = 0},
+        .m_loudness = 1.0F,
+        .m_max_range_tiles = 4.0F,
+    };
+    const HearingListener blocked_listener{
+        .m_listener_tile = TileCoord{.m_col = 0, .m_row = 0},
+        .m_forward = Float3{.m_x = 1.0F, .m_y = 0.0F, .m_z = 0.0F},
+        .m_rear_gain = 0.35F,
+        .m_detection_threshold = 0.05F,
+    };
+    const HearingResult blocked_result = evaluate_hearing_event(grid, blocked_event, blocked_listener);
+    check(blocked_result.m_occluding_blocker_count >= 1, "blocked hearing path should report occluders");
+
+    const HearingEvent clear_event_same_distance{
+        .m_kind = HearingEventKind::Interaction,
+        .m_source_tile = TileCoord{.m_col = 2, .m_row = 1},
+        .m_loudness = 1.0F,
+        .m_max_range_tiles = 4.0F,
+    };
+    const HearingListener clear_listener{
+        .m_listener_tile = TileCoord{.m_col = 0, .m_row = 1},
+        .m_forward = Float3{.m_x = 1.0F, .m_y = 0.0F, .m_z = 0.0F},
+        .m_rear_gain = 0.35F,
+        .m_detection_threshold = 0.05F,
+    };
+    const HearingResult clear_result = evaluate_hearing_event(grid, clear_event_same_distance, clear_listener);
+    check(
+        blocked_result.m_perceived_loudness < clear_result.m_perceived_loudness,
+        "occluded hearing should attenuate perceived loudness");
+
+    const HearingEvent out_of_range_event{
+        .m_kind = HearingEventKind::Ambient,
+        .m_source_tile = TileCoord{.m_col = 2, .m_row = 1},
+        .m_loudness = 1.0F,
+        .m_max_range_tiles = 1.0F,
+    };
+    const HearingResult out_of_range_result = evaluate_hearing_event(grid, out_of_range_event, facing_source);
+    check(!out_of_range_result.m_audible, "out-of-range hearing event should not be audible");
+}
+
 } // namespace
 
 int main()
@@ -223,6 +308,7 @@ int main()
         test_key_and_switch_logic();
         test_occupancy_rules();
         test_line_of_sight_rules();
+        test_directional_hearing_rules();
     }
     catch (const std::exception& ex)
     {
