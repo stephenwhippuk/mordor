@@ -171,6 +171,7 @@ endif()
 if(BUILD_TESTING)
     add_executable(mordor_unit_tests
         tests/unit_tests.cpp
+        src/ability_pipeline.cpp
         src/components.cpp
         src/fog_of_war.cpp
         src/hearing.cpp
