@@ -281,6 +281,37 @@ void Renderer::draw_debug_map(const std::vector<DebugTile>& tiles)
 #endif
 }
 
+void Renderer::draw_screen_overlay(const std::vector<ScreenOverlayRect>& rects)
+{
+#if MORDOR_HAS_OPENGL
+    MORDOR_ASSERT_MSG(m_window != nullptr, "Renderer not initialised");
+
+    glEnable(GL_SCISSOR_TEST);
+
+    for (const ScreenOverlayRect& rect : rects)
+    {
+        if (rect.m_width <= 0 || rect.m_height <= 0)
+        {
+            continue;
+        }
+
+        const int scissor_y = m_window_height - rect.m_y - rect.m_height;
+        if (scissor_y < 0 || scissor_y >= m_window_height)
+        {
+            continue;
+        }
+
+        glScissor(rect.m_x, scissor_y, rect.m_width, rect.m_height);
+        glClearColor(rect.m_r, rect.m_g, rect.m_b, 1.0F);
+        glClear(GL_COLOR_BUFFER_BIT);
+    }
+
+    glDisable(GL_SCISSOR_TEST);
+#else
+    (void)rects;
+#endif
+}
+
 void Renderer::end_frame()
 {
 #if MORDOR_HAS_OPENGL

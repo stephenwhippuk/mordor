@@ -27,6 +27,17 @@ struct DebugTile
     float m_b{0.28F};
 };
 
+struct ScreenOverlayRect
+{
+    int m_x{0};
+    int m_y{0};
+    int m_width{10};
+    int m_height{10};
+    float m_r{0.25F};
+    float m_g{0.36F};
+    float m_b{0.28F};
+};
+
 struct FramebufferSize
 {
     int m_width{0};
@@ -60,6 +71,7 @@ public:
 
     void begin_frame();
     void draw_debug_map(const std::vector<DebugTile>& tiles);
+    void draw_screen_overlay(const std::vector<ScreenOverlayRect>& rects);
     void end_frame();
 
 private:

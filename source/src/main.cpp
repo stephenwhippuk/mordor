@@ -7,7 +7,10 @@
 #include "mordor/occupancy.hpp"
 #include "mordor/fog_of_war.hpp"
 #include "mordor/hearing.hpp"
+#include "mordor/hud_surfaces.hpp"
+#include "mordor/inventory_pipeline.hpp"
 #include "mordor/perception_debug.hpp"
+#include "mordor/party_commands.hpp"
 #include "mordor/scene.hpp"
 #include "mordor/visibility.hpp"
 
@@ -359,6 +362,40 @@ int main(int argc, char** argv)
     const std::vector<mordor::DebugTile> base_debug_map =
         build_debug_tiles_from_scene(world_scene, handcrafted_map);
     std::vector<mordor::DebugTile> debug_map = base_debug_map;
+    std::vector<mordor::ScreenOverlayRect> hud_overlay_rects{};
+
+    mordor::PartySelectionState party_selection{};
+    party_selection.m_selected_actor_ids = {1U, 2U};
+    party_selection.m_primary_actor_id = 1U;
+
+    mordor::PartyCommandQueue party_queue{};
+    party_queue.m_intents.push_back(mordor::PartyCommandIntent{
+        .m_issuer_entity_id = 1U,
+        .m_type = mordor::PartyCommandType::MoveToTile,
+        .m_target_tile = mordor::TileCoord{.m_col = 4, .m_row = 4},
+    });
+
+    mordor::AbilityExecutionQueue ability_queue{};
+    ability_queue.m_requests.push_back(mordor::AbilityRequest{
+        .m_issuer_entity_id = 1U,
+        .m_ability_id = 100U,
+        .m_target_entity_id = 3U,
+    });
+
+    mordor::ItemUseQueue item_use_queue{};
+    item_use_queue.m_intents.push_back(mordor::ItemUseIntent{
+        .m_issuer_entity_id = 1U,
+        .m_item_id = 200U,
+        .m_has_target_tile = true,
+        .m_target_tile = mordor::TileCoord{.m_col = 6, .m_row = 3},
+        .m_consumes_on_use = true,
+    });
+
+    const std::vector<mordor::InventoryItemEntry> demo_inventory_items{
+        mordor::InventoryItemEntry{.m_owner_entity_id = 1U, .m_item_id = 200U, .m_quantity = 2U},
+        mordor::InventoryItemEntry{.m_owner_entity_id = 1U, .m_item_id = 201U, .m_quantity = 1U},
+        mordor::InventoryItemEntry{.m_owner_entity_id = 2U, .m_item_id = 250U, .m_quantity = 3U},
+    };
 
     mordor::LoopConfig config{};
     config.m_fixed_tick_seconds = 1.0 / 60.0;
@@ -367,7 +404,19 @@ int main(int argc, char** argv)
 
     mordor::LoopCallbacks callbacks{};
     callbacks.m_simulate =
-        [&world, &renderer, &world_scene, &occupancy_grid, &fog_of_war, &base_debug_map, &debug_map](double dt) {
+        [&world,
+         &renderer,
+         &world_scene,
+         &occupancy_grid,
+         &fog_of_war,
+         &base_debug_map,
+         &debug_map,
+         &hud_overlay_rects,
+         &party_selection,
+         &party_queue,
+         &ability_queue,
+         &item_use_queue,
+         &demo_inventory_items](double dt) {
         MORDOR_PROFILE_SCOPE("simulate");
         ++world.m_tick_count;
 
@@ -513,15 +562,28 @@ int main(int argc, char** argv)
                         count_fog_visible_tiles(fog_of_war),
                         count_fog_explored_tiles(fog_of_war));
                 }
+
+                const mordor::HudPanelMetrics hud_metrics = mordor::build_hud_panel_metrics(
+                    party_selection,
+                    party_queue,
+                    ability_queue,
+                    item_use_queue,
+                    demo_inventory_items,
+                    party_selection.m_primary_actor_id);
+                hud_overlay_rects = mordor::build_baseline_hud_surfaces(
+                    hud_metrics,
+                    framebuffer_size.m_width,
+                    framebuffer_size.m_height);
             }
         }
     };
-    callbacks.m_render = [&renderer, &debug_map](double alpha) {
+    callbacks.m_render = [&renderer, &debug_map, &hud_overlay_rects](double alpha) {
         MORDOR_PROFILE_SCOPE("render");
         (void)alpha;
 
         renderer.begin_frame();
         renderer.draw_debug_map(debug_map);
+        renderer.draw_screen_overlay(hud_overlay_rects);
         renderer.end_frame();
     };
     callbacks.m_should_continue = [&renderer]() {
