@@ -175,6 +175,7 @@ if(BUILD_TESTING)
         src/interactions.cpp
         src/key_switch.cpp
         src/occupancy.cpp
+        src/visibility.cpp
     )
 
     target_include_directories(mordor_unit_tests

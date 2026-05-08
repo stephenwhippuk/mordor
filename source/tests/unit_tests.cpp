@@ -4,6 +4,7 @@
 #include "mordor/map.hpp"
 #include "mordor/occupancy.hpp"
 #include "mordor/scene.hpp"
+#include "mordor/visibility.hpp"
 
 #include <cstdlib>
 #include <exception>
@@ -167,6 +168,25 @@ void test_occupancy_rules()
         "shared interactable tile should remain blocked when one interactable blocks");
 }
 
+void test_line_of_sight_rules()
+{
+    const DungeonMap map = build_test_map();
+    OccupancyGrid grid{};
+    check(build_occupancy_grid_from_map(map, grid), "occupancy grid build for los should succeed");
+
+    check(
+        has_line_of_sight(grid, TileCoord{.m_col = 0, .m_row = 1}, TileCoord{.m_col = 2, .m_row = 1}),
+        "clear horizontal path should have line of sight");
+
+    const LineOfSightResult blocked_result =
+        trace_line_of_sight(grid, TileCoord{.m_col = 0, .m_row = 0}, TileCoord{.m_col = 2, .m_row = 0});
+    check(!blocked_result.m_has_line_of_sight, "wall between origin and target should block los");
+    check(blocked_result.m_hit_blocker, "blocked los trace should report blocker");
+    check(
+        blocked_result.m_first_blocking_tile.m_col == 1 && blocked_result.m_first_blocking_tile.m_row == 0,
+        "blocked los trace should identify the correct blocking tile");
+}
+
 } // namespace
 
 int main()
@@ -176,6 +196,7 @@ int main()
         test_interaction_state_machines();
         test_key_and_switch_logic();
         test_occupancy_rules();
+        test_line_of_sight_rules();
     }
     catch (const std::exception& ex)
     {
