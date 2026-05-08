@@ -438,6 +438,20 @@ void test_party_selection_and_command_rules()
         blocked_move_result.m_status == PartyCommandIssueStatus::RejectedBlockedTarget,
         "blocked movement command should be rejected");
 
+    check(set_tile_occupant(grid, 2, 1, friendly_b), "occupied move test setup should place occupant");
+
+    const PartyCommandIntent occupied_move{
+        .m_issuer_entity_id = friendly_a,
+        .m_type = PartyCommandType::MoveToTile,
+        .m_target_tile = TileCoord{.m_col = 2, .m_row = 1},
+    };
+    const PartyCommandIssueResult occupied_move_result =
+        issue_party_command(components, grid, selection, occupied_move, queue);
+    check(
+        occupied_move_result.m_status == PartyCommandIssueStatus::RejectedOccupiedTarget,
+        "occupied movement command should be rejected");
+    check(clear_tile_occupant(grid, 2, 1, friendly_b), "occupied move test cleanup should clear occupant");
+
     const PartyCommandIntent clear_move{
         .m_issuer_entity_id = friendly_a,
         .m_type = PartyCommandType::MoveToTile,
@@ -447,6 +461,17 @@ void test_party_selection_and_command_rules()
         issue_party_command(components, grid, selection, clear_move, queue);
     check(clear_move_result.m_status == PartyCommandIssueStatus::Accepted, "clear movement command should be accepted");
     check(queue.m_intents.size() == 1U, "accepted command should be queued");
+
+    const PartyCommandIntent missing_entity_interact{
+        .m_issuer_entity_id = friendly_a,
+        .m_type = PartyCommandType::InteractWithEntity,
+        .m_target_entity_id = 9999U,
+    };
+    const PartyCommandIssueResult missing_entity_interact_result =
+        issue_party_command(components, grid, selection, missing_entity_interact, queue);
+    check(
+        missing_entity_interact_result.m_status == PartyCommandIssueStatus::RejectedTargetEntityNotFound,
+        "interact command should reject non-existent target entity");
 
     const PartyCommandIntent wrong_issuer{
         .m_issuer_entity_id = hostile,

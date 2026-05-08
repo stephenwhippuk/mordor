@@ -42,6 +42,8 @@ enum class PartyCommandIssueStatus : uint8_t
     RejectedBlockedTarget = 6U,
     RejectedQueueFull = 7U,
     RejectedInsufficientActionPoints = 8U,
+    RejectedOccupiedTarget = 9U,
+    RejectedTargetEntityNotFound = 10U,
 };
 
 struct PartyCommandIssueResult

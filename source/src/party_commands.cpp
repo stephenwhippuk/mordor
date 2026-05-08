@@ -22,6 +22,17 @@ bool is_friendly_actor(const ActorComponent& actor)
     return actor.m_allegiance == Allegiance::Friendly;
 }
 
+bool entity_exists(const RuntimeComponents& components, EntityId entity_id)
+{
+    if (entity_id == k_invalid_entity_id)
+    {
+        return false;
+    }
+
+    return std::find(components.m_entities.begin(), components.m_entities.end(), entity_id)
+        != components.m_entities.end();
+}
+
 } // namespace
 
 void clear_party_selection(PartySelectionState& selection)
@@ -158,12 +169,18 @@ PartyCommandIssueResult issue_party_command(
             result.m_status = PartyCommandIssueStatus::RejectedBlockedTarget;
             return result;
         }
+
+        if (is_tile_occupied(grid, intent.m_target_tile.m_col, intent.m_target_tile.m_row))
+        {
+            result.m_status = PartyCommandIssueStatus::RejectedOccupiedTarget;
+            return result;
+        }
     }
     else if (intent.m_type == PartyCommandType::InteractWithEntity)
     {
-        if (intent.m_target_entity_id == k_invalid_entity_id)
+        if (!entity_exists(components, intent.m_target_entity_id))
         {
-            result.m_status = PartyCommandIssueStatus::RejectedInvalidTarget;
+            result.m_status = PartyCommandIssueStatus::RejectedTargetEntityNotFound;
             return result;
         }
     }
