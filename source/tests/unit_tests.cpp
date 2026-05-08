@@ -1024,7 +1024,7 @@ void test_hud_surface_rules()
     check(metrics.m_inventory_total_quantity == 3U, "hud metrics should sum inventory quantities for owner");
 
     const std::vector<ScreenOverlayRect> rects = build_baseline_hud_surfaces(metrics, 1280, 720);
-    check(rects.size() >= 2U, "hud surface builder should produce panel rectangles");
+    check(rects.size() >= 20U, "hud surface builder should produce panels, bars, and label glyph rectangles");
 
     bool found_party_panel = false;
     bool found_inventory_panel = false;
