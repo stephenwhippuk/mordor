@@ -177,6 +177,7 @@ if(BUILD_TESTING)
         src/interactions.cpp
         src/key_switch.cpp
         src/occupancy.cpp
+        src/party_commands.cpp
         src/perception_debug.cpp
         src/visibility.cpp
     )
