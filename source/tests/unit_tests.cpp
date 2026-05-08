@@ -185,6 +185,32 @@ void test_line_of_sight_rules()
     check(
         blocked_result.m_first_blocking_tile.m_col == 1 && blocked_result.m_first_blocking_tile.m_row == 0,
         "blocked los trace should identify the correct blocking tile");
+
+    const LineOfSightResult blocked_target_result =
+        trace_line_of_sight(grid, TileCoord{.m_col = 0, .m_row = 0}, TileCoord{.m_col = 1, .m_row = 0});
+    check(!blocked_target_result.m_has_line_of_sight, "blocked target tile should not have line of sight");
+    check(blocked_target_result.m_hit_blocker, "blocked target should report a blocker");
+    check(
+        blocked_target_result.m_first_blocking_tile.m_col == 1
+            && blocked_target_result.m_first_blocking_tile.m_row == 0,
+        "blocked target should report itself as the blocking tile");
+
+    OccupancyGrid corner_grid{};
+    corner_grid.m_width = 2;
+    corner_grid.m_height = 2;
+    corner_grid.m_static_blocking.assign(4, 0U);
+    corner_grid.m_dynamic_blocking.assign(4, 0U);
+    corner_grid.m_occupants.assign(4, k_invalid_entity_id);
+    check(set_tile_dynamic_blocked(corner_grid, 1, 0, true), "corner wall setup should block east tile");
+    check(set_tile_dynamic_blocked(corner_grid, 0, 1, true), "corner wall setup should block south tile");
+
+    const LineOfSightResult corner_result =
+        trace_line_of_sight(corner_grid, TileCoord{.m_col = 0, .m_row = 0}, TileCoord{.m_col = 1, .m_row = 1});
+    check(!corner_result.m_has_line_of_sight, "los should not pass through a fully blocked diagonal corner");
+    check(corner_result.m_hit_blocker, "blocked corner trace should report a blocker");
+    check(
+        corner_result.m_first_blocking_tile.m_col == 1 && corner_result.m_first_blocking_tile.m_row == 0,
+        "blocked corner should report one of the blocking edge tiles");
 }
 
 } // namespace
