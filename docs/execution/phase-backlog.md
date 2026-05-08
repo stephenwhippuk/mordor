@@ -50,6 +50,7 @@ Must be resolved before rotation is considered production-quality. Tracked for P
 | P2-02 | Implement interaction state machines (door/chest/trap) | P2-01 | High | Complete | plan/development-phases.md |
 | P2-03 | Implement key and switch logic model | P2-02 | High | Complete | plan/basic-engine-release.md |
 | P2-04 | Implement blocking and occupancy rules | P1-06, P2-01 | Medium | Complete | architecture/world-scene-structure.md |
+| P2-05 | Add baseline unit tests for simulation rules | P2-02, P2-03, P2-04 | Medium | Complete | quality/testing-strategy.md |
 
 ## Phase 3 Backlog
 
