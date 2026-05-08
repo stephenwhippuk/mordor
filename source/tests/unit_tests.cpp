@@ -2,6 +2,7 @@
 #include "mordor/components.hpp"
 #include "mordor/fog_of_war.hpp"
 #include "mordor/hearing.hpp"
+#include "mordor/hud_surfaces.hpp"
 #include "mordor/inventory_pipeline.hpp"
 #include "mordor/interactions.hpp"
 #include "mordor/key_switch.hpp"
@@ -981,6 +982,74 @@ void test_inventory_pipeline_rules()
         "item use should reject entries with zero available quantity");
 }
 
+void test_hud_surface_rules()
+{
+    PartySelectionState selection{};
+    selection.m_selected_actor_ids = {11U, 12U};
+    selection.m_primary_actor_id = 11U;
+
+    PartyCommandQueue party_queue{};
+    party_queue.m_intents.push_back(PartyCommandIntent{.m_issuer_entity_id = 11U, .m_type = PartyCommandType::Wait});
+    party_queue.m_intents.push_back(
+        PartyCommandIntent{.m_issuer_entity_id = 12U, .m_type = PartyCommandType::MoveToTile, .m_target_tile = TileCoord{.m_col = 2, .m_row = 1}});
+
+    AbilityExecutionQueue ability_queue{};
+    ability_queue.m_requests.push_back(AbilityRequest{.m_issuer_entity_id = 11U, .m_ability_id = 100U});
+
+    ItemUseQueue item_queue{};
+    item_queue.m_intents.push_back(ItemUseIntent{.m_issuer_entity_id = 11U, .m_item_id = 200U, .m_consumes_on_use = true});
+    item_queue.m_intents.push_back(ItemUseIntent{.m_issuer_entity_id = 11U, .m_item_id = 201U, .m_consumes_on_use = false});
+
+    const std::vector<InventoryItemEntry> inventory_items{
+        InventoryItemEntry{.m_owner_entity_id = 11U, .m_item_id = 200U, .m_quantity = 2U},
+        InventoryItemEntry{.m_owner_entity_id = 11U, .m_item_id = 201U, .m_quantity = 1U},
+        InventoryItemEntry{.m_owner_entity_id = 12U, .m_item_id = 300U, .m_quantity = 5U},
+        InventoryItemEntry{.m_owner_entity_id = 11U, .m_item_id = 202U, .m_quantity = 0U},
+    };
+
+    const HudPanelMetrics metrics = build_hud_panel_metrics(
+        selection,
+        party_queue,
+        ability_queue,
+        item_queue,
+        inventory_items,
+        11U);
+
+    check(metrics.m_selected_actor_count == 2U, "hud metrics should report selected actor count");
+    check(metrics.m_has_primary_actor, "hud metrics should report a primary actor");
+    check(metrics.m_party_queue_size == 2U, "hud metrics should report party queue size");
+    check(metrics.m_ability_queue_size == 1U, "hud metrics should report ability queue size");
+    check(metrics.m_item_queue_size == 2U, "hud metrics should report item queue size");
+    check(metrics.m_inventory_entry_count == 2U, "hud metrics should ignore zero-quantity entries");
+    check(metrics.m_inventory_total_quantity == 3U, "hud metrics should sum inventory quantities for owner");
+
+    const std::vector<ScreenOverlayRect> rects = build_baseline_hud_surfaces(metrics, 1280, 720);
+    check(rects.size() >= 2U, "hud surface builder should produce panel rectangles");
+
+    bool found_party_panel = false;
+    bool found_inventory_panel = false;
+    for (const ScreenOverlayRect& rect : rects)
+    {
+        check(rect.m_width > 0 && rect.m_height > 0, "hud rectangles should have positive size");
+        check(rect.m_y >= 0 && rect.m_y < 720, "hud rectangles should remain within framebuffer y-bounds");
+        if (rect.m_height == 92)
+        {
+            if (!found_inventory_panel)
+            {
+                found_inventory_panel = true;
+            }
+            else
+            {
+                found_party_panel = true;
+            }
+        }
+    }
+    check(found_party_panel && found_inventory_panel, "hud surfaces should include both baseline panels");
+
+    const std::vector<ScreenOverlayRect> empty_rects = build_baseline_hud_surfaces(metrics, 0, 720);
+    check(empty_rects.empty(), "hud surfaces should be empty for invalid framebuffer dimensions");
+}
+
 } // namespace
 
 int main()
@@ -997,6 +1066,7 @@ int main()
         test_party_selection_and_command_rules();
         test_ability_pipeline_rules();
         test_inventory_pipeline_rules();
+        test_hud_surface_rules();
     }
     catch (const std::exception& ex)
     {

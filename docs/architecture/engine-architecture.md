@@ -116,6 +116,10 @@ Responsibilities:
 2. Inventory and context interactions.
 3. Feedback for hidden-information systems (sound cues, detection state).
 
+Current baseline:
+1. Baseline HUD panel metrics aggregate selected party state and command/ability/item queue activity.
+2. Screen-space HUD surfaces now render lightweight party and inventory status panels via deterministic overlay rectangles.
+
 Ordering note:
 1. Use practical debug-first UI, then evolve presentation quality.
 

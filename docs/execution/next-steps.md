@@ -1,16 +1,17 @@
 # Immediate Next Steps (2-3 Weeks)
 
 ## Goal
-Start Phase 4 implementation by turning perception outputs into the playable party command loop.
+Start Phase 5 implementation by turning current command/ability/inventory scaffolding into generation-ready systems.
 
 ## Work Items
-1. Add baseline HUD surfaces for command and party status flow.
-2. Keep command and inventory presentation semantics abstract enough to support iterative game-system design.
+1. Implement room/corridor generation algorithm baseline.
+2. Add generator constraints for key-lock and switch-door progression paths.
+3. Extend integration coverage across party commands, abilities, inventory item use, and HUD surfaces before generation iteration.
 
 ## Success Criteria
-1. A selected party actor can issue deterministic command intents through the simulation command pipeline.
-2. Ability and inventory actions can target map entities without bypassing the simulation pipeline.
-3. HUD command/status feedback reflects command outcomes without requiring manual debug logs.
+1. Generated dungeon layouts produce deterministic room/corridor topology for fixed seeds.
+2. Generated progression gates preserve solvable key-lock and switch-door paths.
+3. Existing command/ability/inventory/HUD baselines remain green under expanded test coverage.
 
 ## Follow-On
-1. Expand integration coverage for command, perception, and inventory interactions before Phase 5 generation work.
+1. Add prefab insertion and full solvability validation after generator baseline stabilizes.
