@@ -83,6 +83,8 @@ Current baseline:
 1. Simulation-owned occupancy grid derives static blocking from the handcrafted map.
 2. Dynamic blocking is applied from interactable state.
 3. Actor occupancy is tracked separately from blocking and can be queried per tile.
+4. Baseline line-of-sight and occlusion queries are implemented over simulation-owned occupancy state, including blocked-target and blocked-corner handling.
+5. Deterministic visibility unit tests now cover clear, blocked, blocked-target, and blocked-corner LOS cases.
 
 Ordering note:
 1. Deterministic behavior is a hard requirement for reliable testing.

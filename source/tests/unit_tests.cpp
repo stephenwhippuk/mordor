@@ -4,6 +4,7 @@
 #include "mordor/map.hpp"
 #include "mordor/occupancy.hpp"
 #include "mordor/scene.hpp"
+#include "mordor/visibility.hpp"
 
 #include <cstdlib>
 #include <exception>
@@ -167,6 +168,51 @@ void test_occupancy_rules()
         "shared interactable tile should remain blocked when one interactable blocks");
 }
 
+void test_line_of_sight_rules()
+{
+    const DungeonMap map = build_test_map();
+    OccupancyGrid grid{};
+    check(build_occupancy_grid_from_map(map, grid), "occupancy grid build for los should succeed");
+
+    check(
+        has_line_of_sight(grid, TileCoord{.m_col = 0, .m_row = 1}, TileCoord{.m_col = 2, .m_row = 1}),
+        "clear horizontal path should have line of sight");
+
+    const LineOfSightResult blocked_result =
+        trace_line_of_sight(grid, TileCoord{.m_col = 0, .m_row = 0}, TileCoord{.m_col = 2, .m_row = 0});
+    check(!blocked_result.m_has_line_of_sight, "wall between origin and target should block los");
+    check(blocked_result.m_hit_blocker, "blocked los trace should report blocker");
+    check(
+        blocked_result.m_first_blocking_tile.m_col == 1 && blocked_result.m_first_blocking_tile.m_row == 0,
+        "blocked los trace should identify the correct blocking tile");
+
+    const LineOfSightResult blocked_target_result =
+        trace_line_of_sight(grid, TileCoord{.m_col = 0, .m_row = 0}, TileCoord{.m_col = 1, .m_row = 0});
+    check(!blocked_target_result.m_has_line_of_sight, "blocked target tile should not have line of sight");
+    check(blocked_target_result.m_hit_blocker, "blocked target should report a blocker");
+    check(
+        blocked_target_result.m_first_blocking_tile.m_col == 1
+            && blocked_target_result.m_first_blocking_tile.m_row == 0,
+        "blocked target should report itself as the blocking tile");
+
+    OccupancyGrid corner_grid{};
+    corner_grid.m_width = 2;
+    corner_grid.m_height = 2;
+    corner_grid.m_static_blocking.assign(4, 0U);
+    corner_grid.m_dynamic_blocking.assign(4, 0U);
+    corner_grid.m_occupants.assign(4, k_invalid_entity_id);
+    check(set_tile_dynamic_blocked(corner_grid, 1, 0, true), "corner wall setup should block east tile");
+    check(set_tile_dynamic_blocked(corner_grid, 0, 1, true), "corner wall setup should block south tile");
+
+    const LineOfSightResult corner_result =
+        trace_line_of_sight(corner_grid, TileCoord{.m_col = 0, .m_row = 0}, TileCoord{.m_col = 1, .m_row = 1});
+    check(!corner_result.m_has_line_of_sight, "los should not pass through a fully blocked diagonal corner");
+    check(corner_result.m_hit_blocker, "blocked corner trace should report a blocker");
+    check(
+        corner_result.m_first_blocking_tile.m_col == 1 && corner_result.m_first_blocking_tile.m_row == 0,
+        "blocked corner should report one of the blocking edge tiles");
+}
+
 } // namespace
 
 int main()
@@ -176,6 +222,7 @@ int main()
         test_interaction_state_machines();
         test_key_and_switch_logic();
         test_occupancy_rules();
+        test_line_of_sight_rules();
     }
     catch (const std::exception& ex)
     {
