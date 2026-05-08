@@ -5,6 +5,7 @@
 #include "mordor/key_switch.hpp"
 #include "mordor/map.hpp"
 #include "mordor/occupancy.hpp"
+#include "mordor/party_commands.hpp"
 #include "mordor/perception_debug.hpp"
 #include "mordor/scene.hpp"
 #include "mordor/visibility.hpp"
@@ -373,6 +374,123 @@ void test_perception_debug_overlay_rules()
     check(hearing_count >= line.size() + 2U, "hearing overlay should include path plus listener/source markers");
 }
 
+void test_party_selection_and_command_rules()
+{
+    RuntimeComponents components{};
+
+    const EntityId friendly_a = allocate_entity(components);
+    const EntityId friendly_b = allocate_entity(components);
+    const EntityId hostile = allocate_entity(components);
+
+    components.m_actors.push_back(ActorComponent{
+        .m_entity_id = friendly_a,
+        .m_archetype_id = 1U,
+        .m_max_action_points = 2U,
+        .m_current_action_points = 2U,
+        .m_move_speed_units_per_second = 3.0F,
+        .m_allegiance = Allegiance::Friendly,
+    });
+    components.m_actors.push_back(ActorComponent{
+        .m_entity_id = friendly_b,
+        .m_archetype_id = 2U,
+        .m_max_action_points = 1U,
+        .m_current_action_points = 1U,
+        .m_move_speed_units_per_second = 3.0F,
+        .m_allegiance = Allegiance::Friendly,
+    });
+    components.m_actors.push_back(ActorComponent{
+        .m_entity_id = hostile,
+        .m_archetype_id = 3U,
+        .m_max_action_points = 2U,
+        .m_current_action_points = 2U,
+        .m_move_speed_units_per_second = 3.0F,
+        .m_allegiance = Allegiance::Hostile,
+    });
+
+    PartySelectionState selection{};
+    check(select_party_actor(components, friendly_a, false, selection), "friendly actor should be selectable");
+    check(is_actor_selected(selection, friendly_a), "selected actor should be tracked");
+    check(selection.m_primary_actor_id == friendly_a, "primary actor should match selected actor");
+
+    check(!select_party_actor(components, hostile, true, selection), "hostile actor should not be selectable");
+    check(selection.m_selected_actor_ids.size() == 1U, "failed hostile selection should not mutate selection");
+
+    check(select_party_actor(components, friendly_b, true, selection), "additive friendly selection should succeed");
+    check(selection.m_selected_actor_ids.size() == 2U, "additive selection should include both actors");
+    check(selection.m_primary_actor_id == friendly_b, "last selected actor should become primary");
+
+    check(deselect_party_actor(selection, friendly_b), "deselecting selected actor should succeed");
+    check(selection.m_primary_actor_id == friendly_a, "primary should fall back to remaining selected actor");
+
+    OccupancyGrid grid{};
+    check(build_occupancy_grid_from_map(build_test_map(), grid), "occupancy build should succeed for command checks");
+
+    PartyCommandQueue queue{};
+
+    const PartyCommandIntent blocked_move{
+        .m_issuer_entity_id = friendly_a,
+        .m_type = PartyCommandType::MoveToTile,
+        .m_target_tile = TileCoord{.m_col = 1, .m_row = 0},
+    };
+    const PartyCommandIssueResult blocked_move_result =
+        issue_party_command(components, grid, selection, blocked_move, queue);
+    check(
+        blocked_move_result.m_status == PartyCommandIssueStatus::RejectedBlockedTarget,
+        "blocked movement command should be rejected");
+
+    check(set_tile_occupant(grid, 2, 1, friendly_b), "occupied move test setup should place occupant");
+
+    const PartyCommandIntent occupied_move{
+        .m_issuer_entity_id = friendly_a,
+        .m_type = PartyCommandType::MoveToTile,
+        .m_target_tile = TileCoord{.m_col = 2, .m_row = 1},
+    };
+    const PartyCommandIssueResult occupied_move_result =
+        issue_party_command(components, grid, selection, occupied_move, queue);
+    check(
+        occupied_move_result.m_status == PartyCommandIssueStatus::RejectedOccupiedTarget,
+        "occupied movement command should be rejected");
+    check(clear_tile_occupant(grid, 2, 1, friendly_b), "occupied move test cleanup should clear occupant");
+
+    const PartyCommandIntent clear_move{
+        .m_issuer_entity_id = friendly_a,
+        .m_type = PartyCommandType::MoveToTile,
+        .m_target_tile = TileCoord{.m_col = 2, .m_row = 1},
+    };
+    const PartyCommandIssueResult clear_move_result =
+        issue_party_command(components, grid, selection, clear_move, queue);
+    check(clear_move_result.m_status == PartyCommandIssueStatus::Accepted, "clear movement command should be accepted");
+    check(queue.m_intents.size() == 1U, "accepted command should be queued");
+
+    const PartyCommandIntent missing_entity_interact{
+        .m_issuer_entity_id = friendly_a,
+        .m_type = PartyCommandType::InteractWithEntity,
+        .m_target_entity_id = 9999U,
+    };
+    const PartyCommandIssueResult missing_entity_interact_result =
+        issue_party_command(components, grid, selection, missing_entity_interact, queue);
+    check(
+        missing_entity_interact_result.m_status == PartyCommandIssueStatus::RejectedTargetEntityNotFound,
+        "interact command should reject non-existent target entity");
+
+    const PartyCommandIntent wrong_issuer{
+        .m_issuer_entity_id = hostile,
+        .m_type = PartyCommandType::Wait,
+    };
+    const PartyCommandIssueResult wrong_issuer_result =
+        issue_party_command(components, grid, selection, wrong_issuer, queue);
+    check(
+        wrong_issuer_result.m_status == PartyCommandIssueStatus::RejectedIssuerNotSelected,
+        "issuer not in selection should be rejected");
+
+    clear_party_selection(selection);
+    const PartyCommandIssueResult no_selection_result =
+        issue_party_command(components, grid, selection, clear_move, queue);
+    check(
+        no_selection_result.m_status == PartyCommandIssueStatus::RejectedNoSelection,
+        "issuing with no selection should be rejected");
+}
+
 } // namespace
 
 int main()
@@ -386,6 +504,7 @@ int main()
         test_directional_hearing_rules();
         test_fog_of_war_rules();
         test_perception_debug_overlay_rules();
+        test_party_selection_and_command_rules();
     }
     catch (const std::exception& ex)
     {
