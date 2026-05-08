@@ -154,6 +154,49 @@ mordor::TileCoord world_to_tile(const mordor::OccupancyGrid& grid, const mordor:
     return clamp_tile_to_grid(grid, mordor::TileCoord{.m_col = col, .m_row = row});
 }
 
+mordor::TileCoord nearest_unblocked_tile(
+    const mordor::OccupancyGrid& grid,
+    mordor::TileCoord preferred)
+{
+    preferred = clamp_tile_to_grid(grid, preferred);
+    if (!mordor::is_tile_blocked(grid, preferred.m_col, preferred.m_row))
+    {
+        return preferred;
+    }
+
+    const int max_radius = std::max(grid.m_width, grid.m_height);
+    for (int radius = 1; radius <= max_radius; ++radius)
+    {
+        const int min_col = preferred.m_col - radius;
+        const int max_col = preferred.m_col + radius;
+        const int min_row = preferred.m_row - radius;
+        const int max_row = preferred.m_row + radius;
+
+        for (int row = min_row; row <= max_row; ++row)
+        {
+            for (int col = min_col; col <= max_col; ++col)
+            {
+                if (col != min_col && col != max_col && row != min_row && row != max_row)
+                {
+                    continue;
+                }
+
+                if (!mordor::in_occupancy_bounds(grid, col, row))
+                {
+                    continue;
+                }
+
+                if (!mordor::is_tile_blocked(grid, col, row))
+                {
+                    return mordor::TileCoord{.m_col = col, .m_row = row};
+                }
+            }
+        }
+    }
+
+    return preferred;
+}
+
 mordor::Float3 screen_to_world_point(
     const mordor::CameraState& camera,
     int viewport_width,
@@ -178,6 +221,32 @@ mordor::Float3 screen_to_world_point(
         .m_y = camera.m_y + (scaled_y * inv_zoom),
         .m_z = world_z,
     };
+}
+
+std::size_t count_fog_visible_tiles(const mordor::FogOfWarState& fog)
+{
+    std::size_t count = 0;
+    for (uint8_t value : fog.m_visible)
+    {
+        if (value != 0U)
+        {
+            ++count;
+        }
+    }
+    return count;
+}
+
+std::size_t count_fog_explored_tiles(const mordor::FogOfWarState& fog)
+{
+    std::size_t count = 0;
+    for (uint8_t value : fog.m_explored)
+    {
+        if (value != 0U)
+        {
+            ++count;
+        }
+    }
+    return count;
 }
 
 bool try_load_handcrafted_map(
@@ -275,6 +344,9 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    MORDOR_LOG_INFO(
+        "Perception debug legend: fog_visible=gold fog_explored=slate los_path=cyan los_blocker=red hearing_path_audible=green hearing_path_muffled=gray hearing_listener=teal hearing_source=orange");
+
     const mordor::SceneDebugMetrics scene_metrics =
         mordor::collect_scene_debug_metrics(world_scene);
     MORDOR_LOG_INFO(
@@ -370,8 +442,18 @@ int main(int argc, char** argv)
                     neighborhood_hits.size());
 
                 const mordor::TileCoord observer_tile = world_to_tile(occupancy_grid, sample_world);
+
+                const int target_distance_tiles = std::max(occupancy_grid.m_width, occupancy_grid.m_height);
+                const mordor::TileCoord preferred_los_target = clamp_tile_to_grid(
+                    occupancy_grid,
+                    mordor::TileCoord{
+                        .m_col = observer_tile.m_col
+                            + static_cast<int>(std::round(std::cos(camera.m_rotation_radians) * static_cast<float>(target_distance_tiles))),
+                        .m_row = observer_tile.m_row
+                            + static_cast<int>(std::round(std::sin(camera.m_rotation_radians) * static_cast<float>(target_distance_tiles))),
+                    });
                 const mordor::TileCoord los_target =
-                    clamp_tile_to_grid(occupancy_grid, mordor::TileCoord{.m_col = occupancy_grid.m_width - 1, .m_row = 0});
+                    nearest_unblocked_tile(occupancy_grid, preferred_los_target);
 
                 const mordor::LineOfSightResult los_trace =
                     mordor::trace_line_of_sight(occupancy_grid, observer_tile, los_target);
@@ -413,6 +495,23 @@ int main(int argc, char** argv)
                         hearing_result,
                         hearing_path,
                         debug_map);
+
+                    MORDOR_LOG_DEBUG(
+                        "perception_overlay tick={} observer=({}, {}) los_target=({}, {}) los_blocked={} los_blocker=({}, {}) hearing_source=({}, {}) hearing_audible={} hearing_occluders={} fog_visible={} fog_explored={}",
+                        world.m_tick_count,
+                        observer_tile.m_col,
+                        observer_tile.m_row,
+                        los_target.m_col,
+                        los_target.m_row,
+                        los_trace.m_hit_blocker,
+                        los_trace.m_first_blocking_tile.m_col,
+                        los_trace.m_first_blocking_tile.m_row,
+                        hearing_event.m_source_tile.m_col,
+                        hearing_event.m_source_tile.m_row,
+                        hearing_result.m_audible,
+                        hearing_result.m_occluding_blocker_count,
+                        count_fog_visible_tiles(fog_of_war),
+                        count_fog_explored_tiles(fog_of_war));
                 }
             }
         }
