@@ -17,6 +17,7 @@ This documentation is split by concern so planning can grow without turning into
 ### Planning
 1. [Development Phases](plan/development-phases.md)
 2. [Basic Engine Release Definition](plan/basic-engine-release.md)
+3. [Rendering Engine Integration Plan](plan/rendering-engine-plan.md)
 
 ### Quality
 1. [Testing Strategy](quality/testing-strategy.md)
@@ -32,7 +33,8 @@ This documentation is split by concern so planning can grow without turning into
 4. [0002: Rendering Baseline](decisions/0002-rendering-baseline.md)
 5. [0003: Initial Runtime Data Model Strategy](decisions/0003-data-model-strategy.md)
 6. [0004: Windowing and OpenGL Context Library](decisions/0004-windowing-and-context-library.md)
-6. [0005: World Scene and Spatial Query Structure](decisions/0005-scene-spatial-structure.md)
+7. [0005: World Scene and Spatial Query Structure](decisions/0005-scene-spatial-structure.md)
+8. [0006: Camera, Occlusion, and Mouse Picking Policy](decisions/0006-camera-occlusion-mouse-picking.md)
 
 ### Documentation
 1. [Documentation Contribution Guide](contributing-docs.md)
