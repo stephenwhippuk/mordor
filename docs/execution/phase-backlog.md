@@ -67,7 +67,7 @@ Must be resolved before rotation is considered production-quality. Tracked for P
 |---|---|---|---|---|---|
 | P4-01 | Implement party selection and command issuing | P3-03 | High | Complete | plan/development-phases.md |
 | P4-02 | Implement ability-driven action resolution pipeline | P2-02, P4-01 | High | Complete | plan/development-phases.md |
-| P4-03 | Implement inventory model and map-targeted item use | P2-03, P4-01 | High | Not Started | plan/basic-engine-release.md |
+| P4-03 | Implement inventory model and map-targeted item use | P2-03, P4-01 | High | Complete | plan/basic-engine-release.md |
 | P4-04 | Implement baseline HUD for party and inventory | P4-01, P4-03 | Medium | Not Started | architecture/engine-architecture.md |
 
 ## Phase 5 Backlog

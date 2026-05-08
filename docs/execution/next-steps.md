@@ -4,9 +4,8 @@
 Start Phase 4 implementation by turning perception outputs into the playable party command loop.
 
 ## Work Items
-1. Implement inventory model and map-targeted item use hooks.
-2. Add baseline HUD surfaces for command and party status flow.
-3. Keep command/inventory semantics abstract enough to support iterative game-system design.
+1. Add baseline HUD surfaces for command and party status flow.
+2. Keep command and inventory presentation semantics abstract enough to support iterative game-system design.
 
 ## Success Criteria
 1. A selected party actor can issue deterministic command intents through the simulation command pipeline.
