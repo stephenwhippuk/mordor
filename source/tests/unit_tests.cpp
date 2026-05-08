@@ -2,6 +2,7 @@
 #include "mordor/components.hpp"
 #include "mordor/fog_of_war.hpp"
 #include "mordor/hearing.hpp"
+#include "mordor/inventory_pipeline.hpp"
 #include "mordor/interactions.hpp"
 #include "mordor/key_switch.hpp"
 #include "mordor/map.hpp"
@@ -722,6 +723,264 @@ void test_ability_pipeline_rules()
         "ability request should reject when execution queue is full");
 }
 
+void test_inventory_pipeline_rules()
+{
+    RuntimeComponents components{};
+
+    const EntityId caster = allocate_entity(components);
+    const EntityId target_actor = allocate_entity(components);
+
+    components.m_actors.push_back(ActorComponent{
+        .m_entity_id = caster,
+        .m_archetype_id = 20U,
+        .m_max_action_points = 3U,
+        .m_current_action_points = 3U,
+        .m_move_speed_units_per_second = 3.0F,
+        .m_allegiance = Allegiance::Friendly,
+    });
+    components.m_actors.push_back(ActorComponent{
+        .m_entity_id = target_actor,
+        .m_archetype_id = 21U,
+        .m_max_action_points = 2U,
+        .m_current_action_points = 2U,
+        .m_move_speed_units_per_second = 3.0F,
+        .m_allegiance = Allegiance::Hostile,
+    });
+
+    components.m_inventories.push_back(InventoryComponent{
+        .m_entity_id = caster,
+        .m_capacity = 8U,
+        .m_item_count = 2U,
+    });
+
+    components.m_transforms.push_back(TransformComponent{
+        .m_entity_id = caster,
+        .m_scene_node_id = k_invalid_scene_node_id,
+        .m_local_offset = Float3{.m_x = 0.0F, .m_y = 0.0F, .m_z = 0.0F},
+    });
+    components.m_transforms.push_back(TransformComponent{
+        .m_entity_id = target_actor,
+        .m_scene_node_id = k_invalid_scene_node_id,
+        .m_local_offset = Float3{.m_x = k_scene_tile_world_size, .m_y = 0.0F, .m_z = 0.0F},
+    });
+
+    OccupancyGrid grid{};
+    check(build_occupancy_grid_from_map(build_test_map(), grid), "inventory test occupancy build should succeed");
+    check(set_tile_occupant(grid, 1, 1, target_actor), "inventory test should place occupant on target tile");
+
+    const std::vector<ItemSpec> item_specs{
+        ItemSpec{
+            .m_item_id = 200U,
+            .m_target_kind = ItemTargetKind::Entity,
+            .m_action_point_cost = 1U,
+            .m_max_range_tiles = 4U,
+            .m_allow_empty_tile_target = false,
+            .m_consumes_on_use = true,
+        },
+        ItemSpec{
+            .m_item_id = 201U,
+            .m_target_kind = ItemTargetKind::Tile,
+            .m_action_point_cost = 1U,
+            .m_max_range_tiles = 4U,
+            .m_allow_empty_tile_target = false,
+            .m_consumes_on_use = false,
+        },
+        ItemSpec{
+            .m_item_id = 202U,
+            .m_target_kind = ItemTargetKind::Tile,
+            .m_action_point_cost = 1U,
+            .m_max_range_tiles = 4U,
+            .m_allow_empty_tile_target = true,
+            .m_consumes_on_use = true,
+        },
+        ItemSpec{
+            .m_item_id = 203U,
+            .m_target_kind = ItemTargetKind::None,
+            .m_action_point_cost = 1U,
+            .m_max_range_tiles = 0U,
+            .m_allow_empty_tile_target = false,
+            .m_consumes_on_use = true,
+        },
+        ItemSpec{
+            .m_item_id = 204U,
+            .m_target_kind = ItemTargetKind::Entity,
+            .m_action_point_cost = 5U,
+            .m_max_range_tiles = 4U,
+            .m_allow_empty_tile_target = false,
+            .m_consumes_on_use = false,
+        },
+        ItemSpec{
+            .m_item_id = 205U,
+            .m_target_kind = ItemTargetKind::Entity,
+            .m_action_point_cost = 1U,
+            .m_max_range_tiles = 0U,
+            .m_allow_empty_tile_target = false,
+            .m_consumes_on_use = false,
+        },
+    };
+
+    const std::vector<InventoryItemEntry> inventory_items{
+        InventoryItemEntry{.m_owner_entity_id = caster, .m_item_id = 200U, .m_quantity = 1U},
+        InventoryItemEntry{.m_owner_entity_id = caster, .m_item_id = 201U, .m_quantity = 1U},
+        InventoryItemEntry{.m_owner_entity_id = caster, .m_item_id = 202U, .m_quantity = 2U},
+        InventoryItemEntry{.m_owner_entity_id = caster, .m_item_id = 203U, .m_quantity = 1U},
+        InventoryItemEntry{.m_owner_entity_id = caster, .m_item_id = 204U, .m_quantity = 1U},
+        InventoryItemEntry{.m_owner_entity_id = caster, .m_item_id = 205U, .m_quantity = 1U},
+    };
+
+    check(has_inventory_item(inventory_items, caster, 200U, 1U), "inventory lookup should find owned item");
+    check(!has_inventory_item(inventory_items, caster, 200U, 2U), "inventory lookup should enforce quantity");
+
+    ItemUseQueue queue{};
+
+    const ItemUseRequest unknown_item{
+        .m_issuer_entity_id = caster,
+        .m_item_id = 999U,
+        .m_has_target_entity = true,
+        .m_target_entity_id = target_actor,
+    };
+    check(
+        issue_item_use_request(components, grid, item_specs, inventory_items, unknown_item, queue).m_status
+            == ItemUseIssueStatus::RejectedUnknownItem,
+        "unknown item should be rejected");
+
+    const ItemUseRequest missing_target_entity{
+        .m_issuer_entity_id = caster,
+        .m_item_id = 200U,
+        .m_has_target_entity = true,
+        .m_target_entity_id = 9999U,
+    };
+    check(
+        issue_item_use_request(components, grid, item_specs, inventory_items, missing_target_entity, queue).m_status
+            == ItemUseIssueStatus::RejectedTargetEntityNotFound,
+        "entity-target item should reject missing target entity");
+
+    const ItemUseRequest mixed_entity_and_tile{
+        .m_issuer_entity_id = caster,
+        .m_item_id = 200U,
+        .m_has_target_entity = true,
+        .m_has_target_tile = true,
+        .m_target_entity_id = target_actor,
+        .m_target_tile = TileCoord{.m_col = 2, .m_row = 1},
+    };
+    check(
+        issue_item_use_request(components, grid, item_specs, inventory_items, mixed_entity_and_tile, queue).m_status
+            == ItemUseIssueStatus::RejectedInvalidTarget,
+        "entity-target item should reject mixed entity and tile fields");
+
+    const ItemUseRequest entity_ok{
+        .m_issuer_entity_id = caster,
+        .m_item_id = 200U,
+        .m_has_target_entity = true,
+        .m_target_entity_id = target_actor,
+    };
+    check(
+        issue_item_use_request(components, grid, item_specs, inventory_items, entity_ok, queue).m_status
+            == ItemUseIssueStatus::Accepted,
+        "entity-target item should accept existing in-range target");
+
+    const ItemUseRequest tile_requires_occupied_but_empty{
+        .m_issuer_entity_id = caster,
+        .m_item_id = 201U,
+        .m_has_target_tile = true,
+        .m_target_tile = TileCoord{.m_col = 2, .m_row = 1},
+    };
+    check(
+        issue_item_use_request(components, grid, item_specs, inventory_items, tile_requires_occupied_but_empty, queue)
+            .m_status
+            == ItemUseIssueStatus::RejectedInvalidTarget,
+        "tile-target item without empty-tile support should reject empty tiles");
+
+    const ItemUseRequest tile_requires_occupied_ok{
+        .m_issuer_entity_id = caster,
+        .m_item_id = 201U,
+        .m_has_target_tile = true,
+        .m_target_tile = TileCoord{.m_col = 1, .m_row = 1},
+    };
+    check(
+        issue_item_use_request(components, grid, item_specs, inventory_items, tile_requires_occupied_ok, queue).m_status
+            == ItemUseIssueStatus::Accepted,
+        "tile-target item should accept occupied tile when empty targeting is disabled");
+
+    const ItemUseRequest tile_empty_allowed{
+        .m_issuer_entity_id = caster,
+        .m_item_id = 202U,
+        .m_has_target_tile = true,
+        .m_target_tile = TileCoord{.m_col = 2, .m_row = 1},
+    };
+    check(
+        issue_item_use_request(components, grid, item_specs, inventory_items, tile_empty_allowed, queue).m_status
+            == ItemUseIssueStatus::Accepted,
+        "tile-target item with empty-tile support should accept empty tiles");
+
+    const ItemUseRequest none_with_target{
+        .m_issuer_entity_id = caster,
+        .m_item_id = 203U,
+        .m_has_target_entity = true,
+        .m_target_entity_id = target_actor,
+    };
+    check(
+        issue_item_use_request(components, grid, item_specs, inventory_items, none_with_target, queue).m_status
+            == ItemUseIssueStatus::RejectedInvalidTarget,
+        "none-target item should reject non-empty target fields");
+
+    const ItemUseRequest none_ok{
+        .m_issuer_entity_id = caster,
+        .m_item_id = 203U,
+    };
+    check(
+        issue_item_use_request(components, grid, item_specs, inventory_items, none_ok, queue).m_status
+            == ItemUseIssueStatus::Accepted,
+        "none-target item should accept default empty target fields");
+
+    const ItemUseRequest insufficient_ap{
+        .m_issuer_entity_id = caster,
+        .m_item_id = 204U,
+        .m_has_target_entity = true,
+        .m_target_entity_id = target_actor,
+    };
+    check(
+        issue_item_use_request(components, grid, item_specs, inventory_items, insufficient_ap, queue).m_status
+            == ItemUseIssueStatus::RejectedInsufficientActionPoints,
+        "item use should reject issuer with insufficient action points");
+
+    const ItemUseRequest out_of_range{
+        .m_issuer_entity_id = caster,
+        .m_item_id = 205U,
+        .m_has_target_entity = true,
+        .m_target_entity_id = target_actor,
+    };
+    check(
+        issue_item_use_request(components, grid, item_specs, inventory_items, out_of_range, queue).m_status
+            == ItemUseIssueStatus::RejectedOutOfRange,
+        "item use should reject out-of-range target");
+
+    ItemUseQueue full_queue{};
+    full_queue.m_max_size = 1U;
+    check(
+        issue_item_use_request(components, grid, item_specs, inventory_items, entity_ok, full_queue).m_status
+            == ItemUseIssueStatus::Accepted,
+        "queue seed item use should be accepted");
+    check(
+        issue_item_use_request(components, grid, item_specs, inventory_items, entity_ok, full_queue).m_status
+            == ItemUseIssueStatus::RejectedQueueFull,
+        "item use should reject when queue is full");
+
+    std::vector<InventoryItemEntry> zero_quantity_items = inventory_items;
+    for (InventoryItemEntry& entry : zero_quantity_items)
+    {
+        if (entry.m_item_id == 200U)
+        {
+            entry.m_quantity = 0U;
+            break;
+        }
+    }
+    check(
+        issue_item_use_request(components, grid, item_specs, zero_quantity_items, entity_ok, queue).m_status
+            == ItemUseIssueStatus::RejectedInsufficientItemQuantity,
+        "item use should reject entries with zero available quantity");
+}
+
 } // namespace
 
 int main()
@@ -737,6 +996,7 @@ int main()
         test_perception_debug_overlay_rules();
         test_party_selection_and_command_rules();
         test_ability_pipeline_rules();
+        test_inventory_pipeline_rules();
     }
     catch (const std::exception& ex)
     {

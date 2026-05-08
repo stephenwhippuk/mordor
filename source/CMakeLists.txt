@@ -175,6 +175,7 @@ if(BUILD_TESTING)
         src/components.cpp
         src/fog_of_war.cpp
         src/hearing.cpp
+        src/inventory_pipeline.cpp
         src/interactions.cpp
         src/key_switch.cpp
         src/occupancy.cpp
