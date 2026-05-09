@@ -395,6 +395,17 @@ void Renderer::update_camera_controls(double dt_seconds)
         m_camera.m_zoom -= m_zoom_speed * dt;
     }
     m_camera.m_zoom = std::clamp(m_camera.m_zoom, 0.2F, 4.0F);
+
+    if (is_action_active(InputAction::PitchUp))
+    {
+        m_camera.m_pitch_radians += m_pitch_speed * dt;
+    }
+    if (is_action_active(InputAction::PitchDown))
+    {
+        m_camera.m_pitch_radians -= m_pitch_speed * dt;
+    }
+    // Clamp pitch: ~5.7° (0.1 rad) min, ~85° (1.48 rad) max to maintain playability
+    m_camera.m_pitch_radians = std::clamp(m_camera.m_pitch_radians, 0.1F, 1.48F);
 #else
     (void)dt_seconds;
 #endif
@@ -603,17 +614,17 @@ void Renderer::draw_world()
         return;
     }
 
-    // Fixed camera orbit parameters for P5-01 (configurable in P5-02).
-    constexpr float k_pitch = 0.5236F; // ~30 degrees in radians
-    constexpr float k_dist  = 1200.0F;
+    // Tunable camera orbit parameters (configurable in P5-02).
+    const float pitch = m_camera.m_pitch_radians;
+    const float dist  = m_camera.m_distance;
 
     const float yaw       = m_camera.m_rotation_radians;
-    const float cos_pitch = std::cos(k_pitch);
-    const float sin_pitch = std::sin(k_pitch);
+    const float cos_pitch = std::cos(pitch);
+    const float sin_pitch = std::sin(pitch);
 
-    const float eye_x = m_camera.m_x + std::sin(yaw) * cos_pitch * k_dist;
-    const float eye_y = sin_pitch * k_dist;
-    const float eye_z = m_camera.m_y + std::cos(yaw) * cos_pitch * k_dist;
+    const float eye_x = m_camera.m_x + std::sin(yaw) * cos_pitch * dist;
+    const float eye_y = sin_pitch * dist;
+    const float eye_z = m_camera.m_y + std::cos(yaw) * cos_pitch * dist;
 
     const Mat4 view = mat4_look_at(
         eye_x, eye_y, eye_z,

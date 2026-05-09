@@ -51,6 +51,8 @@ struct CameraState
     float m_y{0.0F};
     float m_zoom{1.0F};
     float m_rotation_radians{0.0F};
+    float m_pitch_radians{0.5236F}; // ~30 degrees (tunable in P5-02)
+    float m_distance{1200.0F};      // orbit distance (tunable in P5-02)
 };
 
 class Renderer
@@ -88,6 +90,7 @@ private:
     float m_pan_speed{350.0F};
     float m_zoom_speed{1.0F};
     float m_rotation_speed{1.5F};
+    float m_pitch_speed{1.0F};          // radians per second when adjusting pitch
 
     // World geometry GPU resources (0 = unloaded).
     uint32_t m_world_shader{0U};
