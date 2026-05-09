@@ -1,14 +1,13 @@
 # Immediate Next Steps (2-3 Weeks)
 
 ## Goal
-Start Phase 5 implementation by replacing the debug draw path with a proper 3D renderer that preserves interaction readability.
+Continue Phase 5 by building camera, picking, and occlusion handling on top of the new shader/VBO world-rendering baseline.
 
 ## Work Items
-1. Implement shader/VBO floor and wall rendering from map data.
-2. Implement angled isometric-perspective camera controls with tunable defaults.
-3. Add mouse-driven tile/entity selection and stable picking resolution.
-4. Add wall fade/hide occlusion handling so foreground geometry does not block practical selection.
-5. Add render submission and culling metrics for baseline performance tracking.
+1. Implement angled isometric-perspective camera controls with tunable defaults.
+2. Add mouse-driven tile/entity selection and stable picking resolution.
+3. Add wall fade/hide occlusion handling so foreground geometry does not block practical selection.
+4. Add render submission and culling metrics for baseline performance tracking.
 
 ## Success Criteria
 1. Handcrafted map renders as stable 3D floor/wall geometry from an isometric angle.

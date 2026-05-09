@@ -4,6 +4,7 @@
 #include "mordor/main_loop.hpp"
 #include "mordor/renderer.hpp"
 #include "mordor/map.hpp"
+#include "mordor/world_mesh.hpp"
 #include "mordor/occupancy.hpp"
 #include "mordor/fog_of_war.hpp"
 #include "mordor/hearing.hpp"
@@ -329,6 +330,22 @@ int main(int argc, char** argv)
         world_scene.m_spatial_index.m_indexed_node_count,
         world_scene.m_spatial_index.m_cells.size());
 
+    const mordor::WorldMesh world_mesh =
+        mordor::build_world_mesh(world_scene, handcrafted_map);
+    if (world_mesh.m_vertices.empty() || world_mesh.m_indices.empty())
+    {
+        MORDOR_LOG_CRITICAL("Failed to build world mesh from scene/map");
+        renderer.shutdown();
+        mordor::log::shutdown();
+        return 1;
+    }
+    MORDOR_LOG_INFO(
+        "Built world mesh vertices={} indices={}",
+        world_mesh.m_vertices.size(),
+        world_mesh.m_indices.size());
+    renderer.load_world_mesh(world_mesh);
+
+
     mordor::OccupancyGrid occupancy_grid{};
     if (!mordor::build_occupancy_grid_from_map(handcrafted_map, occupancy_grid))
     {
@@ -577,12 +594,12 @@ int main(int argc, char** argv)
             }
         }
     };
-    callbacks.m_render = [&renderer, &debug_map, &hud_overlay_rects](double alpha) {
+    callbacks.m_render = [&renderer, &hud_overlay_rects](double alpha) {
         MORDOR_PROFILE_SCOPE("render");
         (void)alpha;
 
         renderer.begin_frame();
-        renderer.draw_debug_map(debug_map);
+        renderer.draw_world();
         renderer.draw_screen_overlay(hud_overlay_rects);
         renderer.end_frame();
     };

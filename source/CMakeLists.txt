@@ -182,7 +182,9 @@ if(BUILD_TESTING)
         src/occupancy.cpp
         src/party_commands.cpp
         src/perception_debug.cpp
+        src/scene.cpp
         src/visibility.cpp
+        src/world_mesh.cpp
     )
 
     target_include_directories(mordor_unit_tests

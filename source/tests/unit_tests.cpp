@@ -12,6 +12,7 @@
 #include "mordor/perception_debug.hpp"
 #include "mordor/scene.hpp"
 #include "mordor/visibility.hpp"
+#include "mordor/world_mesh.hpp"
 
 #include <cmath>
 #include <cstdlib>
@@ -1050,6 +1051,43 @@ void test_hud_surface_rules()
     check(empty_rects.empty(), "hud surfaces should be empty for invalid framebuffer dimensions");
 }
 
+void test_world_mesh_generation_rules()
+{
+    const DungeonMap map = build_test_map();
+
+    Scene scene{};
+    check(build_scene_from_dungeon_map(map, scene), "scene build should succeed for world mesh tests");
+
+    const WorldMesh mesh = build_world_mesh(scene, map);
+
+    // build_test_map has 5 floor tiles and 1 wall tile.
+    // floor emits 4 verts + 6 indices, wall emits 20 verts + 30 indices.
+    const std::size_t expected_floor_count = 5U;
+    const std::size_t expected_wall_count = 1U;
+    const std::size_t expected_vertices = (expected_floor_count * 4U) + (expected_wall_count * 20U);
+    const std::size_t expected_indices = (expected_floor_count * 6U) + (expected_wall_count * 30U);
+
+    check(mesh.m_vertices.size() == expected_vertices, "world mesh vertex count should match floor+wall emission");
+    check(mesh.m_indices.size() == expected_indices, "world mesh index count should match floor+wall emission");
+
+    // Deterministic output: repeated builds should byte-match counts and index ordering.
+    const WorldMesh mesh_again = build_world_mesh(scene, map);
+    check(mesh_again.m_vertices.size() == mesh.m_vertices.size(), "world mesh build should be deterministic for vertices");
+    check(mesh_again.m_indices.size() == mesh.m_indices.size(), "world mesh build should be deterministic for indices");
+    check(mesh_again.m_indices == mesh.m_indices, "world mesh index ordering should be deterministic");
+
+    bool found_raised_wall_vertex = false;
+    for (const WorldVertex& v : mesh.m_vertices)
+    {
+        if (v.m_y > 0.0F)
+        {
+            found_raised_wall_vertex = true;
+            break;
+        }
+    }
+    check(found_raised_wall_vertex, "world mesh should contain raised vertices for wall geometry");
+}
+
 } // namespace
 
 int main()
@@ -1067,6 +1105,7 @@ int main()
         test_ability_pipeline_rules();
         test_inventory_pipeline_rules();
         test_hud_surface_rules();
+        test_world_mesh_generation_rules();
     }
     catch (const std::exception& ex)
     {
