@@ -1115,6 +1115,9 @@ void test_room_corridor_generation_rules()
     check(
         generated_a.m_generated_constraints.size() == generated_b.m_generated_constraints.size(),
         "deterministic runs should have same number of generated constraints");
+    check(
+        generated_a.m_prefab_placements.size() == generated_b.m_prefab_placements.size(),
+        "deterministic runs should have same number of prefab placements");
 
     std::size_t floor_count = 0;
     std::size_t wall_count = 0;
@@ -1167,6 +1170,47 @@ void test_room_corridor_generation_rules()
         check(!generated_a.m_tiles[key_idx].m_blocks_movement, "constraint key tile should be walkable");
         check(generated_a.m_tiles[switch_idx].m_symbol == 'S', "constraint switch tile should use 'S' symbol");
         check(!generated_a.m_tiles[switch_idx].m_blocks_movement, "constraint switch tile should be walkable");
+    }
+
+    if (!generated_a.m_prefab_placements.empty())
+    {
+        const DungeonMap::PrefabPlacement& p = generated_a.m_prefab_placements.front();
+        const DungeonMap::PrefabPlacement& p_again = generated_b.m_prefab_placements.front();
+
+        check(p.m_prefab_id != 0U, "prefab placement id should be non-zero");
+        check(p.m_prefab_id == p_again.m_prefab_id, "deterministic runs should preserve prefab id");
+        check(
+            p.m_origin_col == p_again.m_origin_col && p.m_origin_row == p_again.m_origin_row,
+            "deterministic runs should preserve prefab origin");
+        check(
+            p.m_width == p_again.m_width && p.m_height == p_again.m_height,
+            "deterministic runs should preserve prefab dimensions");
+
+        check(p.m_width > 0 && p.m_height > 0, "prefab placement dimensions should be positive");
+        check(p.m_origin_col >= 0 && p.m_origin_row >= 0, "prefab placement origin should be in bounds");
+        check(
+            p.m_origin_col + p.m_width <= generated_a.m_width
+            && p.m_origin_row + p.m_height <= generated_a.m_height,
+            "prefab placement bounds should fit within generated map");
+
+        bool found_prefab_marker = false;
+        for (int row = p.m_origin_row; row < p.m_origin_row + p.m_height; ++row)
+        {
+            for (int col = p.m_origin_col; col < p.m_origin_col + p.m_width; ++col)
+            {
+                const std::size_t idx = static_cast<std::size_t>(row * generated_a.m_width + col);
+                if (generated_a.m_tiles[idx].m_symbol == 'P')
+                {
+                    found_prefab_marker = true;
+                    break;
+                }
+            }
+            if (found_prefab_marker)
+            {
+                break;
+            }
+        }
+        check(found_prefab_marker, "prefab placement area should include prefab marker tiles");
     }
 
     // Baseline connectivity: all floor tiles are reachable from the first floor tile.

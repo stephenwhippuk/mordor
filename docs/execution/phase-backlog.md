@@ -94,7 +94,7 @@ Must be resolved before rotation is considered production-quality. Tracked for P
 |---|---|---|---|---|---|
 | P6-01 | Implement room/corridor generation algorithm | P5-01 | High | Complete | plan/development-phases.md |
 | P6-02 | Add key-lock and switch-door generator constraints | P6-01 | High | Complete | research/research-tracks.md |
-| P6-03 | Add prefab insertion support for complex scenes | P6-01 | Medium | Not Started | research/research-tracks.md |
+| P6-03 | Add prefab insertion support for complex scenes | P6-01 | Medium | Complete | research/research-tracks.md |
 | P6-04 | Build validation pass for reachability and solvability | P6-01, P6-02 | High | Not Started | quality/testing-strategy.md |
 
 ## Phase 7 Backlog
