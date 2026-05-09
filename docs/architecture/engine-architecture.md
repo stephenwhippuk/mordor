@@ -56,11 +56,13 @@ Current baseline:
 1. OpenGL 4.1 core profile context (decision 0002).
 2. GLFW-based window/context bootstrap (decision 0004).
 3. Shader/VBO world rendering path submits floor and wall geometry from map/scene data as indexed 3D mesh data.
-4. Isometric-perspective camera with tunable pitch (0.1–1.48 rad) and orbit distance (configurable per-frame); yaw/zoom/pan controlled via input bindings (Q/E for rotate, R/F for zoom, T/G for pitch, WASD for pan).
-5. Camera movement and control consume input actions from the platform input binding layer rather than hard-coded key checks.
-6. A handcrafted dungeon test map is loaded from an ASCII asset and rendered with collision-state debug overlays.
-7. Perception debug overlays render LOS rays, hearing event traces, and fog visible/explored cells from simulation-owned query outputs.
-8. Screen-space HUD is composited as deterministic overlay surfaces over the world pass.
+4. Isometric-perspective camera with tunable pitch (0.1–1.48 rad) and orbit distance; yaw/zoom/pan/pitch controlled via input bindings (Q/E, R/F, T/G, WASD).
+5. Screen-to-world projection for mouse cursor: converts screen coordinates to world space accounting for camera rotation, zoom, and viewport.
+6. Mouse-driven tile/entity picking: queries scene spatial index at cursor location; returns priority-ordered candidates based on distance; debug diagnostics log point hits, best hit, and neighborhood results every 120 ticks.
+7. Camera movement and controls consume input actions from the platform input binding layer rather than hard-coded key checks.
+8. A handcrafted dungeon test map is loaded from an ASCII asset and rendered with collision-state debug overlays.
+9. Perception debug overlays render LOS rays, hearing event traces, and fog visible/explored cells from simulation-owned query outputs.
+10. Screen-space HUD is composited as deterministic overlay surfaces over the world pass.
 
 Ordering note:
 1. Ship stable world rendering before advanced visual effects.

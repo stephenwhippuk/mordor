@@ -461,8 +461,13 @@ int main(int argc, char** argv)
             const auto framebuffer_size = renderer.framebuffer_size();
             if (framebuffer_size.m_width > 0 && framebuffer_size.m_height > 0)
             {
-                const float sample_screen_x = 0.5F * static_cast<float>(framebuffer_size.m_width);
-                const float sample_screen_y = 0.5F * static_cast<float>(framebuffer_size.m_height);
+                // Use actual mouse position for picking query
+                int mouse_x = 0;
+                int mouse_y = 0;
+                renderer.mouse_position(mouse_x, mouse_y);
+
+                const float sample_screen_x = static_cast<float>(mouse_x);
+                const float sample_screen_y = static_cast<float>(mouse_y);
 
                 const mordor::CameraState camera = renderer.camera_state();
                 const mordor::Float3 sample_world = screen_to_world_point(
@@ -498,10 +503,12 @@ int main(int argc, char** argv)
                     mordor::query_scene_bounds(world_scene, neighborhood);
 
                 MORDOR_LOG_DEBUG(
-                    "scene_query tick={} framebuffer=({}x{}) sample_world=({}, {}, {}) point_hits={} picked={} neighborhood_hits={}",
+                    "scene_query tick={} framebuffer=({}x{}) mouse=({}, {}) world_point=({}, {}, {}) point_hits={} picked={} neighborhood_hits={}",
                     world.m_tick_count,
                     framebuffer_size.m_width,
                     framebuffer_size.m_height,
+                    mouse_x,
+                    mouse_y,
                     sample_world.m_x,
                     sample_world.m_y,
                     sample_world.m_z,
