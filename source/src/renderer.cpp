@@ -442,6 +442,11 @@ void Renderer::mouse_position(int& out_x, int& out_y) const
     out_y = 0;
 }
 
+RenderMetrics Renderer::render_metrics() const
+{
+    return m_render_metrics;
+}
+
 void Renderer::begin_frame()
 {
 #if MORDOR_HAS_OPENGL
@@ -632,7 +637,7 @@ void Renderer::load_world_mesh(const WorldMesh& mesh)
 #endif
 }
 
-void Renderer::draw_world()
+void Renderer::draw_world(const Scene& scene, const DungeonMap& map)
 {
 #if MORDOR_HAS_OPENGL
     if (m_window == nullptr || m_world_shader == 0U
@@ -663,6 +668,34 @@ void Renderer::draw_world()
     const Mat4 proj    = mat4_ortho(-half_w, half_w, -half_h, half_h, -2000.0F, 2000.0F);
     const Mat4 mvp     = mat4_mul(proj, view);
 
+    // P5-05: Calculate frustum AABB for culling (ortho projection bounds + depth range).
+    // Frustum AABB in world space: camera XZ position +/- half viewport, depth from eye.
+    m_frustum_bounds = Bounds3{
+        .m_min = Float3{
+            .m_x = m_camera.m_x - half_w,
+            .m_y = eye_y - 1000.0F,  // Depth range below eye
+            .m_z = m_camera.m_y - half_h,
+        },
+        .m_max = Float3{
+            .m_x = m_camera.m_x + half_w,
+            .m_y = eye_y + 1000.0F,  // Depth range above eye
+            .m_z = m_camera.m_y + half_h,
+        },
+    };
+
+    // Query scene for geometry within frustum (P5-05).
+    const std::vector<SceneNodeId> visible_nodes = query_scene_bounds(scene, m_frustum_bounds);
+
+    // P5-05: Calculate render metrics.
+    m_render_metrics.m_total_indices = m_world_index_count;
+    m_render_metrics.m_total_vertices = static_cast<int>(m_render_metrics.m_total_indices / 3);  // Approximate: 1 triangle = 3 indices
+    m_render_metrics.m_frustum_visible_nodes = static_cast<int>(visible_nodes.size());
+    m_render_metrics.m_frustum_culled_nodes = static_cast<int>(scene.m_nodes.size() - visible_nodes.size());
+    // For now, submit all geometry (actual culling is future optimization).
+    m_render_metrics.m_visible_indices = m_world_index_count;
+    m_render_metrics.m_visible_vertices = m_render_metrics.m_total_vertices;
+    m_render_metrics.m_culled_indices = 0;
+
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
     glEnable(GL_BLEND);
@@ -682,6 +715,9 @@ void Renderer::draw_world()
     glUseProgram(0U);
     glDisable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);
+#else
+    (void)scene;
+    (void)map;
 #endif
 }
 

@@ -603,14 +603,32 @@ int main(int argc, char** argv)
             }
         }
     };
-    callbacks.m_render = [&renderer, &hud_overlay_rects](double alpha) {
+    callbacks.m_render = [&renderer, &world_scene, &handcrafted_map, &hud_overlay_rects, &world](double alpha) {
         MORDOR_PROFILE_SCOPE("render");
         (void)alpha;
 
         renderer.begin_frame();
-        renderer.draw_world();
+        renderer.draw_world(world_scene, handcrafted_map);
         renderer.draw_screen_overlay(hud_overlay_rects);
         renderer.end_frame();
+
+        // P5-05: Log render metrics every 120 ticks.
+        if (world.m_tick_count % 120 == 0)
+        {
+            const mordor::RenderMetrics metrics = renderer.render_metrics();
+            MORDOR_LOG_DEBUG(
+                "render_metrics tick={} total_indices={} visible_indices={} culled_indices={} "
+                "visible_nodes={} culled_nodes={} culling_rate={}%",
+                world.m_tick_count,
+                metrics.m_total_indices,
+                metrics.m_visible_indices,
+                metrics.m_culled_indices,
+                metrics.m_frustum_visible_nodes,
+                metrics.m_frustum_culled_nodes,
+                (metrics.m_total_indices > 0)
+                    ? static_cast<int>((100.0 * metrics.m_culled_indices) / metrics.m_total_indices)
+                    : 0);
+        }
     };
     callbacks.m_should_continue = [&renderer]() {
         return !renderer.should_close();

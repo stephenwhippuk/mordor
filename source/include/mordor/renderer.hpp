@@ -9,6 +9,8 @@
 struct GLFWwindow;
 
 namespace mordor {
+class Scene;
+struct DungeonMap;
 
 struct RendererConfig
 {
@@ -55,6 +57,18 @@ struct CameraState
     float m_distance{1200.0F};      // orbit distance (tunable in P5-02)
 };
 
+/// Render submission metrics for performance analysis (P5-05).
+struct RenderMetrics
+{
+    int m_total_vertices{0};      // Total vertices in world mesh
+    int m_total_indices{0};       // Total indices (triangles * 3)
+    int m_visible_vertices{0};    // Vertices in frustum-visible geometry
+    int m_visible_indices{0};     // Indices submitted for rendering
+    int m_culled_indices{0};      // Indices culled (not in frustum)
+    int m_frustum_culled_nodes{0}; // Scene nodes rejected by frustum test
+    int m_frustum_visible_nodes{0}; // Scene nodes inside frustum
+};
+
 class Renderer
 {
 public:
@@ -72,12 +86,13 @@ public:
     CameraState camera_state() const;
     FramebufferSize framebuffer_size() const;
     void mouse_position(int& out_x, int& out_y) const;  // Current cursor position in screen space
+    RenderMetrics render_metrics() const;  // Last frame's render submission metrics (P5-05)
 
     void begin_frame();
     void draw_debug_map(const std::vector<DebugTile>& tiles);
     void draw_screen_overlay(const std::vector<ScreenOverlayRect>& rects);
     void load_world_mesh(const WorldMesh& mesh);
-    void draw_world();
+    void draw_world(const Scene& scene, const DungeonMap& map);  // Updated for P5-05: frustum culling needs scene queries
     void end_frame();
 
 private:
@@ -100,6 +115,10 @@ private:
     uint32_t m_world_vbo{0U};
     uint32_t m_world_ibo{0U};
     int      m_world_index_count{0};
+
+    // Render metrics and frustum culling (P5-05).
+    RenderMetrics m_render_metrics{};
+    Bounds3 m_frustum_bounds{};  // Camera frustum AABB for culling queries
 };
 
 } // namespace mordor
