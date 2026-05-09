@@ -4,13 +4,13 @@
 Advance Phase 6 generation baseline from deterministic room/corridor layout to constrained, validated dungeon generation.
 
 ## Work Items
-1. Extend generator output with key-lock and switch-door placement constraints.
-2. Add prefab insertion hooks for authored set-piece rooms.
-3. Add reachability and solvability validation pass for generated outputs.
+1. Add prefab insertion hooks for authored set-piece rooms.
+2. Add reachability and solvability validation pass for generated outputs.
+3. Bind generated key/switch/door metadata into runtime interactable placement.
 
 ## Success Criteria
 1. Generated maps are deterministic for fixed seeds and satisfy baseline room/corridor connectivity.
-2. Key progression constraints can be generated without producing dead-end progression states.
+2. Key/switch/door constraints are generated deterministically and remain stable per seed.
 3. Validation pass rejects unsolved or disconnected outputs with actionable failure reasons.
 4. Existing simulation and rendering baselines remain green while generation features land.
 

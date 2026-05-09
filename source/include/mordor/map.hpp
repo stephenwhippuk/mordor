@@ -19,6 +19,17 @@ struct DungeonMap
     int m_width{0};
     int m_height{0};
     std::vector<DungeonTile> m_tiles{};
+    struct DoorConstraint
+    {
+        uint32_t m_key_id{0U};
+        int m_door_col{0};
+        int m_door_row{0};
+        int m_key_col{0};
+        int m_key_row{0};
+        int m_switch_col{0};
+        int m_switch_row{0};
+    };
+    std::vector<DoorConstraint> m_generated_constraints{};
 };
 
 struct DungeonGenerationConfig
@@ -29,6 +40,7 @@ struct DungeonGenerationConfig
     int m_min_room_size{4};
     int m_max_room_size{10};
     uint32_t m_seed{1337U};
+    bool m_enable_key_switch_constraints{true};
 };
 
 bool load_handcrafted_dungeon_map(const std::string& path, DungeonMap& out_map);

@@ -1112,6 +1112,9 @@ void test_room_corridor_generation_rules()
         "generated map should fill full tile grid");
 
     check(generated_a.m_tiles.size() == generated_b.m_tiles.size(), "deterministic runs should have same tile count");
+    check(
+        generated_a.m_generated_constraints.size() == generated_b.m_generated_constraints.size(),
+        "deterministic runs should have same number of generated constraints");
 
     std::size_t floor_count = 0;
     std::size_t wall_count = 0;
@@ -1135,6 +1138,36 @@ void test_room_corridor_generation_rules()
 
     check(floor_count > 0, "generated map should include walkable floor tiles");
     check(wall_count > 0, "generated map should include wall tiles");
+
+    check(
+        !generated_a.m_generated_constraints.empty(),
+        "generator should place at least one key/switch/door constraint");
+
+    if (!generated_a.m_generated_constraints.empty())
+    {
+        const DungeonMap::DoorConstraint& c = generated_a.m_generated_constraints.front();
+        const DungeonMap::DoorConstraint& c_again = generated_b.m_generated_constraints.front();
+
+        check(c.m_key_id != 0U, "generated constraint key id should be non-zero");
+        check(c.m_key_id == c_again.m_key_id, "deterministic runs should preserve key id");
+        check(c.m_door_col == c_again.m_door_col && c.m_door_row == c_again.m_door_row,
+            "deterministic runs should preserve door placement");
+        check(c.m_key_col == c_again.m_key_col && c.m_key_row == c_again.m_key_row,
+            "deterministic runs should preserve key placement");
+        check(c.m_switch_col == c_again.m_switch_col && c.m_switch_row == c_again.m_switch_row,
+            "deterministic runs should preserve switch placement");
+
+        const std::size_t door_idx = static_cast<std::size_t>(c.m_door_row * generated_a.m_width + c.m_door_col);
+        const std::size_t key_idx = static_cast<std::size_t>(c.m_key_row * generated_a.m_width + c.m_key_col);
+        const std::size_t switch_idx = static_cast<std::size_t>(c.m_switch_row * generated_a.m_width + c.m_switch_col);
+
+        check(generated_a.m_tiles[door_idx].m_symbol == 'D', "constraint door tile should use 'D' symbol");
+        check(generated_a.m_tiles[door_idx].m_blocks_movement, "constraint door tile should block movement");
+        check(generated_a.m_tiles[key_idx].m_symbol == 'K', "constraint key tile should use 'K' symbol");
+        check(!generated_a.m_tiles[key_idx].m_blocks_movement, "constraint key tile should be walkable");
+        check(generated_a.m_tiles[switch_idx].m_symbol == 'S', "constraint switch tile should use 'S' symbol");
+        check(!generated_a.m_tiles[switch_idx].m_blocks_movement, "constraint switch tile should be walkable");
+    }
 
     // Baseline connectivity: all floor tiles are reachable from the first floor tile.
     int start_idx = -1;
