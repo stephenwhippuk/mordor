@@ -11,8 +11,8 @@ namespace mordor {
 /// Height of wall geometry above the floor plane, in world units.
 constexpr float k_wall_height = 48.0F;
 
-/// Single vertex in the 3D world geometry buffer: position + colour.
-/// Layout: (x, y, z, r, g, b) — 6 floats, 24 bytes, no padding.
+/// Single vertex in the 3D world geometry buffer: position + colour + alpha.
+/// Layout: (x, y, z, r, g, b, a) — 7 floats, 28 bytes, no padding.
 struct WorldVertex
 {
     float m_x{0.0F};
@@ -21,6 +21,7 @@ struct WorldVertex
     float m_r{1.0F};
     float m_g{1.0F};
     float m_b{1.0F};
+    float m_alpha{1.0F};  // Opacity: 1.0 = opaque, 0.5 = faded (occluded), 0.0 = invisible
 };
 
 /// CPU-side world geometry ready for GPU upload.

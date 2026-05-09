@@ -175,20 +175,24 @@ static constexpr const char* k_world_vert_src = R"glsl(
 #version 410 core
 layout(location = 0) in vec3 a_pos;
 layout(location = 1) in vec3 a_col;
+layout(location = 2) in float a_alpha;
 uniform mat4 u_mvp;
 out vec3 v_col;
+out float v_alpha;
 void main() {
     gl_Position = u_mvp * vec4(a_pos, 1.0);
     v_col = a_col;
+    v_alpha = a_alpha;
 }
 )glsl";
 
 static constexpr const char* k_world_frag_src = R"glsl(
 #version 410 core
 in vec3 v_col;
+in float v_alpha;
 out vec4 frag;
 void main() {
-    frag = vec4(v_col, 1.0);
+    frag = vec4(v_col, v_alpha);
 }
 )glsl";
 
@@ -598,6 +602,12 @@ void Renderer::load_world_mesh(const WorldMesh& mesh)
         reinterpret_cast<const void*>(offsetof(WorldVertex, m_r)));
     glEnableVertexAttribArray(1U);
 
+    // Attribute 2: alpha (float, offset 24).
+    glVertexAttribPointer(
+        2U, 1, GL_FLOAT, GL_FALSE, stride,
+        reinterpret_cast<const void*>(offsetof(WorldVertex, m_alpha)));
+    glEnableVertexAttribArray(2U);
+
     // Upload index data (stays bound in the VAO).
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
     glBufferData(
@@ -655,6 +665,8 @@ void Renderer::draw_world()
 
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     glUseProgram(static_cast<GLuint>(m_world_shader));
     glUniformMatrix4fv(m_mvp_uniform, 1, GL_FALSE, mvp.m);
@@ -668,6 +680,7 @@ void Renderer::draw_world()
     glBindVertexArray(0U);
 
     glUseProgram(0U);
+    glDisable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);
 #endif
 }
