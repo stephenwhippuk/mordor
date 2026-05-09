@@ -60,10 +60,11 @@ Current baseline:
 5. Screen-to-world projection for mouse cursor: converts screen coordinates to world space accounting for camera rotation, zoom, and viewport.
 6. Mouse-driven tile/entity picking: queries scene spatial index at cursor location; returns priority-ordered candidates based on distance; debug diagnostics log point hits, best hit, and neighborhood results every 120 ticks.
 7. Camera movement and controls consume input actions from the platform input binding layer rather than hard-coded key checks.
-8. A handcrafted dungeon test map is loaded from an ASCII asset and rendered with collision-state debug overlays.
-9. Perception debug overlays render LOS rays, hearing event traces, and fog visible/explored cells from simulation-owned query outputs.
-10. Screen-space HUD is composited as deterministic overlay surfaces over the world pass.
-11. Per-vertex alpha channel support: world geometry vertices now include opacity (alpha) for occlusion handling; OpenGL blending (GL_SRC_ALPHA / GL_ONE_MINUS_SRC_ALPHA) is enabled during world drawing to fade foreground walls and improve interaction readability.
+8. Runtime boots from deterministic room/corridor generated dungeon data by default (fixed seed in current bootstrap), with fallback to handcrafted ASCII map if generation/validation fails.
+9. Generated gameplay symbols are visualized in world mesh output: doors render as brown blocking geometry, player marker as blue sphere, keys as yellow spheres, switches as white spheres.
+10. Perception debug overlays render LOS rays, hearing event traces, and fog visible/explored cells from simulation-owned query outputs.
+11. Screen-space HUD is composited as deterministic overlay surfaces over the world pass.
+12. Per-vertex alpha channel support: world geometry vertices now include opacity (alpha) for occlusion handling; OpenGL blending (GL_SRC_ALPHA / GL_ONE_MINUS_SRC_ALPHA) is enabled during world drawing to fade foreground walls and improve interaction readability.
 
 Ordering note:
 1. Ship stable world rendering before advanced visual effects.

@@ -1087,6 +1087,65 @@ void test_world_mesh_generation_rules()
         }
     }
     check(found_raised_wall_vertex, "world mesh should contain raised vertices for wall geometry");
+
+    DungeonMap symbol_map = build_test_map();
+    symbol_map.m_tiles[0].m_symbol = 'A';
+    symbol_map.m_tiles[1].m_symbol = 'D';
+    symbol_map.m_tiles[2].m_symbol = 'K';
+    symbol_map.m_tiles[3].m_symbol = 'S';
+
+    Scene symbol_scene{};
+    check(build_scene_from_dungeon_map(symbol_map, symbol_scene), "scene build should succeed for symbol mesh tests");
+
+    const WorldMesh symbol_mesh = build_world_mesh(symbol_scene, symbol_map, 0.0F, 0.0F);
+
+    constexpr std::size_t marker_vertices = 77U;
+    constexpr std::size_t marker_indices = 360U;
+    const std::size_t expected_symbol_vertices = expected_vertices + (3U * marker_vertices);
+    const std::size_t expected_symbol_indices = expected_indices + (3U * marker_indices);
+    check(
+        symbol_mesh.m_vertices.size() == expected_symbol_vertices,
+        "world mesh should include marker sphere vertices for A/K/S symbols");
+    check(
+        symbol_mesh.m_indices.size() == expected_symbol_indices,
+        "world mesh should include marker sphere indices for A/K/S symbols");
+
+    bool found_blue_marker = false;
+    bool found_yellow_marker = false;
+    bool found_white_marker = false;
+    bool found_door_brown = false;
+    for (const WorldVertex& v : symbol_mesh.m_vertices)
+    {
+        if (v.m_r == 0.20F && v.m_g == 0.45F && v.m_b == 0.95F)
+        {
+            found_blue_marker = true;
+        }
+        else if (v.m_r == 0.95F && v.m_g == 0.85F && v.m_b == 0.20F)
+        {
+            found_yellow_marker = true;
+        }
+        else if (v.m_r == 0.92F && v.m_g == 0.92F && v.m_b == 0.92F)
+        {
+            found_white_marker = true;
+        }
+        else if (v.m_r == 0.52F && v.m_g == 0.34F && v.m_b == 0.18F)
+        {
+            found_door_brown = true;
+        }
+    }
+
+    check(found_blue_marker, "world mesh should render a blue marker for player symbol A");
+    check(found_yellow_marker, "world mesh should render a yellow marker for key symbol K");
+    check(found_white_marker, "world mesh should render a white marker for switch symbol S");
+    check(found_door_brown, "world mesh should render brown geometry for door symbol D");
+
+    const WorldMesh symbol_mesh_again = build_world_mesh(symbol_scene, symbol_map, 0.0F, 0.0F);
+    check(
+        symbol_mesh_again.m_vertices.size() == symbol_mesh.m_vertices.size(),
+        "symbol mesh build should be deterministic for vertex counts");
+    check(
+        symbol_mesh_again.m_indices == symbol_mesh.m_indices,
+        "symbol mesh build should be deterministic for index ordering");
 }
 
 void test_room_corridor_generation_rules()
