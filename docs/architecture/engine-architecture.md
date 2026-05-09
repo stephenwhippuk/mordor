@@ -95,6 +95,7 @@ Current baseline:
 7. Fog-of-war state now tracks visible versus explored cells and refreshes visibility from observer tiles using LOS-gated simulation queries.
 8. Perception debug-tile builders produce deterministic overlay payloads that map LOS, hearing, and fog results into renderer-consumable debug geometry.
 9. Deterministic room/corridor generation baseline is implemented in the map layer: non-overlapping rectangular rooms are carved into wall-filled maps and connected with L-shaped corridors using seed-driven random generation.
+10. Generator constraints baseline now places deterministic key/switch/door triplets: locked doors are embedded on generated traversal routes with paired key and switch placements emitted as map metadata for follow-on gameplay binding.
 
 Ordering note:
 1. Deterministic behavior is a hard requirement for reliable testing.
