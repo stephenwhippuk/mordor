@@ -17,6 +17,8 @@ InputBindings::InputBindings()
     set_bindings(InputAction::RotateRight, {GLFW_KEY_E});
     set_bindings(InputAction::ZoomIn, {GLFW_KEY_R});
     set_bindings(InputAction::ZoomOut, {GLFW_KEY_F});
+    set_bindings(InputAction::PitchUp, {GLFW_KEY_T});
+    set_bindings(InputAction::PitchDown, {GLFW_KEY_G});
 #else
     set_bindings(InputAction::PanLeft, {});
     set_bindings(InputAction::PanRight, {});
@@ -26,6 +28,8 @@ InputBindings::InputBindings()
     set_bindings(InputAction::RotateRight, {});
     set_bindings(InputAction::ZoomIn, {});
     set_bindings(InputAction::ZoomOut, {});
+    set_bindings(InputAction::PitchUp, {});
+    set_bindings(InputAction::PitchDown, {});
 #endif
 }
 

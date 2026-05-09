@@ -18,6 +18,8 @@ enum class InputAction : std::size_t
     RotateRight,
     ZoomIn,
     ZoomOut,
+    PitchUp,    // Increase camera pitch (look steeper down at map)
+    PitchDown,  // Decrease camera pitch (look shallower)
     Count
 };
 

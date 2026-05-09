@@ -443,13 +443,15 @@ int main(int argc, char** argv)
         {
             const mordor::CameraState camera = renderer.camera_state();
             MORDOR_LOG_DEBUG(
-                "simulate tick={} dt={} camera=({}, {}, zoom={}, rot={})",
+                "simulate tick={} dt={} camera=({}, {}, zoom={}, rot={}, pitch={}, dist={})",
                 world.m_tick_count,
                 dt,
                 camera.m_x,
                 camera.m_y,
                 camera.m_zoom,
-                camera.m_rotation_radians);
+                camera.m_rotation_radians,
+                camera.m_pitch_radians,
+                camera.m_distance);
         }
 
         if (world.m_tick_count % 120 == 0)

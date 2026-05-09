@@ -1,13 +1,12 @@
 # Immediate Next Steps (2-3 Weeks)
 
 ## Goal
-Continue Phase 5 by building camera, picking, and occlusion handling on top of the new shader/VBO world-rendering baseline.
+Continue Phase 5 by adding mouse picking and occlusion handling to the tunable camera system.
 
 ## Work Items
-1. Implement angled isometric-perspective camera controls with tunable defaults.
-2. Add mouse-driven tile/entity selection and stable picking resolution.
-3. Add wall fade/hide occlusion handling so foreground geometry does not block practical selection.
-4. Add render submission and culling metrics for baseline performance tracking.
+1. Implement mouse-driven tile/entity selection and stable picking resolution.
+2. Add wall fade/hide occlusion handling so foreground geometry does not block practical selection.
+3. Add render submission and culling metrics for baseline performance tracking.
 
 ## Success Criteria
 1. Handcrafted map renders as stable 3D floor/wall geometry from an isometric angle.
