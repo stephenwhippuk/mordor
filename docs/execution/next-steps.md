@@ -20,7 +20,14 @@ Complete Phase 5 rendering baseline by adding occlusion handling and performance
 1. Wall mesh over-generation: world mesh currently emits full wall side faces per blocked tile, including interior faces between adjacent wall tiles. This creates unnecessary polygons and becomes visible during occlusion fades.
 2. Occlusion anchor ambiguity: wall fade currently appears camera-position driven rather than clearly actor/party-position driven. Actor location and whether camera motion is coupled to actor state are not yet explicit in runtime diagnostics.
 
+## Occlusion Behavior Contract (Required)
+1. Use active character (or selected party member) world position as the occlusion reference anchor.
+2. Fade only occluders between camera and anchor that materially block character readability.
+3. Do not fade walls behind the character relative to camera view direction.
+4. Preserve full map detail outside the occlusion corridor unless another gameplay system (for example fog-of-war or line-of-sight) intentionally limits visibility.
+
 ## Follow-Up Actions
 1. Add a mesh optimization pass that suppresses interior wall faces shared by neighboring blocked tiles.
-2. Define and document occlusion source-of-truth (camera vs active party member), then update fade calculation accordingly.
-3. Add debug telemetry that logs occlusion reference position and active party tile so behavior can be verified during movement tests.
+2. Define and document occlusion source-of-truth as active party position and update fade calculation to test camera-to-actor occluders only.
+3. Add debug telemetry that logs camera position, active party tile/world position, and count of occlusion-faded tiles each sample interval.
+4. Add acceptance checks: rotate camera around stationary actor and verify that only foreground blockers fade while background walls remain opaque.
