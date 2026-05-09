@@ -76,7 +76,7 @@ Must be resolved before rotation is considered production-quality. Tracked for P
 |---|---|---|---|---|---|
 | P5-01 | Implement shader/VBO world rendering for map walls and floors | P1-05, P1-07 | High | Complete | plan/rendering-engine-plan.md |
 | P5-02 | Implement tunable isometric-perspective camera rig | P1-03, P5-01 | High | Complete | plan/rendering-engine-plan.md |
-| P5-03 | Implement mouse-driven tile/entity selection and picking | P1-08, P5-01 | High | Not Started | plan/rendering-engine-plan.md |
+| P5-03 | Implement mouse-driven tile/entity selection and picking | P1-08, P5-01 | High | Complete | plan/rendering-engine-plan.md |
 | P5-04 | Implement occlusion-aware wall fade/hide for interaction readability | P3-01, P5-02, P5-03 | High | Not Started | plan/rendering-engine-plan.md |
 | P5-05 | Add frustum culling and render submission metrics | P1-08, P5-01 | Medium | Not Started | plan/rendering-engine-plan.md |
 

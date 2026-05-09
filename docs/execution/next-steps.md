@@ -1,12 +1,11 @@
 # Immediate Next Steps (2-3 Weeks)
 
 ## Goal
-Continue Phase 5 by adding mouse picking and occlusion handling to the tunable camera system.
+Complete Phase 5 rendering baseline by adding occlusion handling and performance metrics.
 
 ## Work Items
-1. Implement mouse-driven tile/entity selection and stable picking resolution.
-2. Add wall fade/hide occlusion handling so foreground geometry does not block practical selection.
-3. Add render submission and culling metrics for baseline performance tracking.
+1. Add wall fade/hide occlusion handling so foreground geometry does not block practical selection.
+2. Add render submission and culling metrics for baseline performance tracking.
 
 ## Success Criteria
 1. Handcrafted map renders as stable 3D floor/wall geometry from an isometric angle.
