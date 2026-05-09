@@ -13,7 +13,7 @@ namespace {
 
 bool is_supported_tile(char symbol)
 {
-    return symbol == '#' || symbol == '.' || symbol == 'D' || symbol == 'K' || symbol == 'S';
+    return symbol == '#' || symbol == '.' || symbol == 'D' || symbol == 'K' || symbol == 'S' || symbol == 'P';
 }
 
 bool tile_blocks_movement(char symbol)
@@ -58,6 +58,12 @@ struct RoomRect
     int m_y{0};
     int m_w{0};
     int m_h{0};
+};
+
+struct PrefabTemplate
+{
+    uint32_t m_id{0U};
+    std::vector<std::string> m_rows{};
 };
 
 bool rooms_overlap_with_margin(const RoomRect& a, const RoomRect& b, int margin)
@@ -105,6 +111,146 @@ std::pair<int, int> room_center(const RoomRect& room)
         room.m_x + (room.m_w / 2),
         room.m_y + (room.m_h / 2),
     };
+}
+
+const std::vector<PrefabTemplate>& builtin_prefabs()
+{
+    static const std::vector<PrefabTemplate> prefabs{
+        PrefabTemplate{
+            .m_id = 1U,
+            .m_rows = {
+                ".....",
+                ".PPP.",
+                ".P.P.",
+                ".PPP.",
+                ".....",
+            },
+        },
+        PrefabTemplate{
+            .m_id = 2U,
+            .m_rows = {
+                ".......",
+                "..PPP..",
+                "..P.P..",
+                "PPP.PPP",
+                "..P.P..",
+                "..PPP..",
+                ".......",
+            },
+        },
+    };
+    return prefabs;
+}
+
+bool can_place_prefab(const DungeonMap& map, const PrefabTemplate& prefab, int origin_col, int origin_row)
+{
+    const int prefab_h = static_cast<int>(prefab.m_rows.size());
+    const int prefab_w = prefab_h > 0 ? static_cast<int>(prefab.m_rows[0].size()) : 0;
+    if (prefab_w <= 0 || prefab_h <= 0)
+    {
+        return false;
+    }
+
+    for (int r = 0; r < prefab_h; ++r)
+    {
+        for (int c = 0; c < prefab_w; ++c)
+        {
+            const int col = origin_col + c;
+            const int row = origin_row + r;
+            if (!is_in_bounds(map, col, row))
+            {
+                return false;
+            }
+
+            const DungeonTile& tile = map.m_tiles[tile_index(map, col, row)];
+            // Only place on existing walkable carved space and never overwrite constraint markers.
+            if (tile.m_blocks_movement || tile.m_symbol == 'D' || tile.m_symbol == 'K' || tile.m_symbol == 'S')
+            {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+void apply_prefab(DungeonMap& map, const PrefabTemplate& prefab, int origin_col, int origin_row)
+{
+    const int prefab_h = static_cast<int>(prefab.m_rows.size());
+    const int prefab_w = prefab_h > 0 ? static_cast<int>(prefab.m_rows[0].size()) : 0;
+
+    for (int r = 0; r < prefab_h; ++r)
+    {
+        for (int c = 0; c < prefab_w; ++c)
+        {
+            const char sym = prefab.m_rows[static_cast<std::size_t>(r)][static_cast<std::size_t>(c)];
+            if (sym == 'P')
+            {
+                set_tile(map, origin_col + c, origin_row + r, 'P', false);
+            }
+            else
+            {
+                set_tile(map, origin_col + c, origin_row + r, '.', false);
+            }
+        }
+    }
+
+    map.m_prefab_placements.push_back(DungeonMap::PrefabPlacement{
+        .m_prefab_id = prefab.m_id,
+        .m_origin_col = origin_col,
+        .m_origin_row = origin_row,
+        .m_width = prefab_w,
+        .m_height = prefab_h,
+    });
+}
+
+void place_prefabs(
+    DungeonMap& map,
+    const std::vector<RoomRect>& rooms,
+    std::mt19937& rng,
+    const DungeonGenerationConfig& config)
+{
+    if (!config.m_enable_prefab_insertion || config.m_prefab_attempt_count <= 0 || rooms.empty())
+    {
+        return;
+    }
+
+    const std::vector<PrefabTemplate>& prefabs = builtin_prefabs();
+    if (prefabs.empty())
+    {
+        return;
+    }
+
+    std::uniform_int_distribution<int> prefab_dist(0, static_cast<int>(prefabs.size() - 1));
+
+    int placed = 0;
+    // Prefer later rooms to avoid interfering with early key/switch/door constraints.
+    for (std::size_t room_idx = std::min<std::size_t>(2, rooms.size()); room_idx < rooms.size(); ++room_idx)
+    {
+        if (placed >= config.m_prefab_attempt_count)
+        {
+            break;
+        }
+
+        const RoomRect& room = rooms[room_idx];
+        const PrefabTemplate& prefab = prefabs[static_cast<std::size_t>(prefab_dist(rng))];
+        const int prefab_h = static_cast<int>(prefab.m_rows.size());
+        const int prefab_w = prefab_h > 0 ? static_cast<int>(prefab.m_rows[0].size()) : 0;
+        if (prefab_w <= 0 || prefab_h <= 0 || room.m_w < prefab_w || room.m_h < prefab_h)
+        {
+            continue;
+        }
+
+        const int origin_col = room.m_x + (room.m_w - prefab_w) / 2;
+        const int origin_row = room.m_y + (room.m_h - prefab_h) / 2;
+        if (!can_place_prefab(map, prefab, origin_col, origin_row))
+        {
+            continue;
+        }
+
+        apply_prefab(map, prefab, origin_col, origin_row);
+        ++placed;
+    }
 }
 
 std::pair<int, int> find_nearest_walkable(
@@ -274,6 +420,7 @@ bool load_handcrafted_dungeon_map(const std::string& path, DungeonMap& out_map)
     }
 
     parsed.m_generated_constraints.clear();
+    parsed.m_prefab_placements.clear();
 
     out_map = std::move(parsed);
     return true;
@@ -383,6 +530,8 @@ bool generate_room_corridor_dungeon_map(const DungeonGenerationConfig& config, D
     {
         place_key_switch_door_constraint(generated, rooms, rng);
     }
+
+    place_prefabs(generated, rooms, rng, config);
 
     out_map = std::move(generated);
     return true;

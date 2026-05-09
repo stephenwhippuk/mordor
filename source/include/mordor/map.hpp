@@ -30,6 +30,16 @@ struct DungeonMap
         int m_switch_row{0};
     };
     std::vector<DoorConstraint> m_generated_constraints{};
+
+    struct PrefabPlacement
+    {
+        uint32_t m_prefab_id{0U};
+        int m_origin_col{0};
+        int m_origin_row{0};
+        int m_width{0};
+        int m_height{0};
+    };
+    std::vector<PrefabPlacement> m_prefab_placements{};
 };
 
 struct DungeonGenerationConfig
@@ -41,6 +51,8 @@ struct DungeonGenerationConfig
     int m_max_room_size{10};
     uint32_t m_seed{1337U};
     bool m_enable_key_switch_constraints{true};
+    bool m_enable_prefab_insertion{true};
+    int m_prefab_attempt_count{2};
 };
 
 bool load_handcrafted_dungeon_map(const std::string& path, DungeonMap& out_map);
