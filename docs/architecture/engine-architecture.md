@@ -55,10 +55,11 @@ Responsibilities:
 Current baseline:
 1. OpenGL 4.1 core profile context (decision 0002).
 2. GLFW-based window/context bootstrap (decision 0004).
-3. Temporary debug map draw path implemented as scissor-constrained clear regions until shader/VBO pipeline lands.
+3. Shader/VBO world rendering path now submits floor and wall geometry from map/scene data as indexed 3D mesh data.
 4. Camera movement consumes input actions from the platform input binding layer rather than hard-coded key checks.
 5. A handcrafted dungeon test map is loaded from an ASCII asset and rendered with collision-state debug overlays.
 6. Perception debug overlays now render LOS rays, hearing event traces, and fog visible/explored cells from simulation-owned query outputs.
+7. Screen-space HUD remains composited as deterministic overlay surfaces over the world pass.
 
 Ordering note:
 1. Ship stable world rendering before advanced visual effects.

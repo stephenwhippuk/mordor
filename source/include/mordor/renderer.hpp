@@ -1,6 +1,7 @@
 #pragma once
 
 #include "mordor/input.hpp"
+#include "mordor/world_mesh.hpp"
 
 #include <cstdint>
 #include <vector>
@@ -72,6 +73,8 @@ public:
     void begin_frame();
     void draw_debug_map(const std::vector<DebugTile>& tiles);
     void draw_screen_overlay(const std::vector<ScreenOverlayRect>& rects);
+    void load_world_mesh(const WorldMesh& mesh);
+    void draw_world();
     void end_frame();
 
 private:
@@ -85,6 +88,14 @@ private:
     float m_pan_speed{350.0F};
     float m_zoom_speed{1.0F};
     float m_rotation_speed{1.5F};
+
+    // World geometry GPU resources (0 = unloaded).
+    uint32_t m_world_shader{0U};
+    int      m_mvp_uniform{-1};
+    uint32_t m_world_vao{0U};
+    uint32_t m_world_vbo{0U};
+    uint32_t m_world_ibo{0U};
+    int      m_world_index_count{0};
 };
 
 } // namespace mordor
