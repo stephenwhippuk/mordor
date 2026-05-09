@@ -71,6 +71,7 @@ public:
     void update_camera_controls(double dt_seconds);
     CameraState camera_state() const;
     FramebufferSize framebuffer_size() const;
+    void mouse_position(int& out_x, int& out_y) const;  // Current cursor position in screen space
 
     void begin_frame();
     void draw_debug_map(const std::vector<DebugTile>& tiles);

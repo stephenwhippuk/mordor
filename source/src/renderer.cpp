@@ -421,6 +421,23 @@ FramebufferSize Renderer::framebuffer_size() const
     return FramebufferSize{.m_width = m_window_width, .m_height = m_window_height};
 }
 
+void Renderer::mouse_position(int& out_x, int& out_y) const
+{
+#if MORDOR_HAS_GLFW
+    if (m_window != nullptr)
+    {
+        double mouse_x = 0.0;
+        double mouse_y = 0.0;
+        glfwGetCursorPos(m_window, &mouse_x, &mouse_y);
+        out_x = static_cast<int>(mouse_x);
+        out_y = static_cast<int>(mouse_y);
+        return;
+    }
+#endif
+    out_x = 0;
+    out_y = 0;
+}
+
 void Renderer::begin_frame()
 {
 #if MORDOR_HAS_OPENGL
