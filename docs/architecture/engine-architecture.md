@@ -63,6 +63,7 @@ Current baseline:
 8. A handcrafted dungeon test map is loaded from an ASCII asset and rendered with collision-state debug overlays.
 9. Perception debug overlays render LOS rays, hearing event traces, and fog visible/explored cells from simulation-owned query outputs.
 10. Screen-space HUD is composited as deterministic overlay surfaces over the world pass.
+11. Per-vertex alpha channel support: world geometry vertices now include opacity (alpha) for occlusion handling; OpenGL blending (GL_SRC_ALPHA / GL_ONE_MINUS_SRC_ALPHA) is enabled during world drawing to fade foreground walls and improve interaction readability.
 
 Ordering note:
 1. Ship stable world rendering before advanced visual effects.
