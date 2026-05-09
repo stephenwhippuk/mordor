@@ -55,7 +55,19 @@ struct DungeonGenerationConfig
     int m_prefab_attempt_count{2};
 };
 
+struct DungeonValidationReport
+{
+    bool m_is_valid{false};
+    bool m_is_solvable_with_unlocks{false};
+    bool m_constraints_valid{false};
+    int m_walkable_tile_count{0};
+    int m_reachable_without_unlocks{0};
+    int m_reachable_with_unlocks{0};
+    std::vector<std::string> m_issues{};
+};
+
 bool load_handcrafted_dungeon_map(const std::string& path, DungeonMap& out_map);
 bool generate_room_corridor_dungeon_map(const DungeonGenerationConfig& config, DungeonMap& out_map);
+bool validate_generated_dungeon_map(const DungeonMap& map, DungeonValidationReport& out_report);
 
 } // namespace mordor
