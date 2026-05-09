@@ -114,8 +114,10 @@ private:
     int      m_mvp_uniform{-1};
     uint32_t m_world_vao{0U};
     uint32_t m_world_vbo{0U};
-    uint32_t m_world_ibo{0U};
-    int      m_world_index_count{0};
+    uint32_t m_world_ibo_opaque{0U};
+    uint32_t m_world_ibo_transparent{0U};
+    int      m_world_opaque_index_count{0};
+    int      m_world_transparent_index_count{0};
 
     // Render metrics and frustum culling (P5-05).
     RenderMetrics m_render_metrics{};

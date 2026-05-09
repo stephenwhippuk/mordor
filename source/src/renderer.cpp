@@ -296,14 +296,24 @@ void Renderer::shutdown()
     {
         GLuint vao_gl = static_cast<GLuint>(m_world_vao);
         GLuint vbo_gl = static_cast<GLuint>(m_world_vbo);
-        GLuint ibo_gl = static_cast<GLuint>(m_world_ibo);
+        GLuint ibo_opaque_gl = static_cast<GLuint>(m_world_ibo_opaque);
+        GLuint ibo_transparent_gl = static_cast<GLuint>(m_world_ibo_transparent);
         glDeleteVertexArrays(1, &vao_gl);
         glDeleteBuffers(1, &vbo_gl);
-        glDeleteBuffers(1, &ibo_gl);
+        if (ibo_opaque_gl != 0U)
+        {
+            glDeleteBuffers(1, &ibo_opaque_gl);
+        }
+        if (ibo_transparent_gl != 0U)
+        {
+            glDeleteBuffers(1, &ibo_transparent_gl);
+        }
         m_world_vao = 0U;
         m_world_vbo = 0U;
-        m_world_ibo = 0U;
-        m_world_index_count = 0;
+        m_world_ibo_opaque = 0U;
+        m_world_ibo_transparent = 0U;
+        m_world_opaque_index_count = 0;
+        m_world_transparent_index_count = 0;
     }
     if (m_world_shader != 0U)
     {
@@ -574,7 +584,8 @@ void Renderer::draw_screen_overlay(const std::vector<ScreenOverlayRect>& rects)
 void Renderer::load_world_mesh(const WorldMesh& mesh)
 {
 #if MORDOR_HAS_OPENGL
-    if (m_window == nullptr || mesh.m_vertices.empty() || mesh.m_indices.empty())
+    if (m_window == nullptr || mesh.m_vertices.empty()
+        || (mesh.m_opaque_indices.empty() && mesh.m_transparent_indices.empty()))
     {
         return;
     }
@@ -584,22 +595,40 @@ void Renderer::load_world_mesh(const WorldMesh& mesh)
     {
         GLuint vao_gl = static_cast<GLuint>(m_world_vao);
         GLuint vbo_gl = static_cast<GLuint>(m_world_vbo);
-        GLuint ibo_gl = static_cast<GLuint>(m_world_ibo);
+        GLuint ibo_opaque_gl = static_cast<GLuint>(m_world_ibo_opaque);
+        GLuint ibo_transparent_gl = static_cast<GLuint>(m_world_ibo_transparent);
         glDeleteVertexArrays(1, &vao_gl);
         glDeleteBuffers(1, &vbo_gl);
-        glDeleteBuffers(1, &ibo_gl);
+        if (ibo_opaque_gl != 0U)
+        {
+            glDeleteBuffers(1, &ibo_opaque_gl);
+        }
+        if (ibo_transparent_gl != 0U)
+        {
+            glDeleteBuffers(1, &ibo_transparent_gl);
+        }
         m_world_vao = 0U;
         m_world_vbo = 0U;
-        m_world_ibo = 0U;
-        m_world_index_count = 0;
+        m_world_ibo_opaque = 0U;
+        m_world_ibo_transparent = 0U;
+        m_world_opaque_index_count = 0;
+        m_world_transparent_index_count = 0;
     }
 
     GLuint vao = 0U;
     GLuint vbo = 0U;
-    GLuint ibo = 0U;
+    GLuint ibo_opaque = 0U;
+    GLuint ibo_transparent = 0U;
     glGenVertexArrays(1, &vao);
     glGenBuffers(1, &vbo);
-    glGenBuffers(1, &ibo);
+    if (!mesh.m_opaque_indices.empty())
+    {
+        glGenBuffers(1, &ibo_opaque);
+    }
+    if (!mesh.m_transparent_indices.empty())
+    {
+        glGenBuffers(1, &ibo_transparent);
+    }
 
     glBindVertexArray(vao);
 
@@ -630,25 +659,41 @@ void Renderer::load_world_mesh(const WorldMesh& mesh)
         reinterpret_cast<const void*>(offsetof(WorldVertex, m_alpha)));
     glEnableVertexAttribArray(2U);
 
-    // Upload index data (stays bound in the VAO).
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-    glBufferData(
-        GL_ELEMENT_ARRAY_BUFFER,
-        static_cast<GLsizeiptr>(mesh.m_indices.size() * sizeof(uint32_t)),
-        mesh.m_indices.data(),
-        GL_STATIC_DRAW);
+    if (ibo_opaque != 0U)
+    {
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_opaque);
+        glBufferData(
+            GL_ELEMENT_ARRAY_BUFFER,
+            static_cast<GLsizeiptr>(mesh.m_opaque_indices.size() * sizeof(uint32_t)),
+            mesh.m_opaque_indices.data(),
+            GL_STATIC_DRAW);
+    }
+
+    if (ibo_transparent != 0U)
+    {
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_transparent);
+        glBufferData(
+            GL_ELEMENT_ARRAY_BUFFER,
+            static_cast<GLsizeiptr>(mesh.m_transparent_indices.size() * sizeof(uint32_t)),
+            mesh.m_transparent_indices.data(),
+            GL_STATIC_DRAW);
+    }
 
     glBindVertexArray(0U);
 
     m_world_vao         = static_cast<uint32_t>(vao);
     m_world_vbo         = static_cast<uint32_t>(vbo);
-    m_world_ibo         = static_cast<uint32_t>(ibo);
-    m_world_index_count = static_cast<int>(mesh.m_indices.size());
+    m_world_ibo_opaque = static_cast<uint32_t>(ibo_opaque);
+    m_world_opaque_index_count = static_cast<int>(mesh.m_opaque_indices.size());
+
+    m_world_ibo_transparent = static_cast<uint32_t>(ibo_transparent);
+    m_world_transparent_index_count = static_cast<int>(mesh.m_transparent_indices.size());
 
     MORDOR_LOG_INFO(
-        "World mesh loaded: vertices={} indices={}",
+        "World mesh loaded: vertices={} opaque_indices={} transparent_indices={}",
         mesh.m_vertices.size(),
-        mesh.m_indices.size());
+        mesh.m_opaque_indices.size(),
+        mesh.m_transparent_indices.size());
 #else
     (void)mesh;
 #endif
@@ -658,7 +703,8 @@ void Renderer::draw_world(const Scene& scene, const DungeonMap& map)
 {
 #if MORDOR_HAS_OPENGL
     if (m_window == nullptr || m_world_shader == 0U
-        || m_world_vao == 0U || m_world_index_count <= 0)
+        || m_world_vao == 0U
+        || (m_world_opaque_index_count <= 0 && m_world_transparent_index_count <= 0))
     {
         return;
     }
@@ -704,33 +750,52 @@ void Renderer::draw_world(const Scene& scene, const DungeonMap& map)
     const std::vector<SceneNodeId> visible_nodes = query_scene_bounds(scene, m_frustum_bounds);
 
     // P5-05: Calculate render metrics.
-    m_render_metrics.m_total_indices = m_world_index_count;
+    m_render_metrics.m_total_indices = m_world_opaque_index_count + m_world_transparent_index_count;
     m_render_metrics.m_total_vertices = static_cast<int>(m_render_metrics.m_total_indices / 3);  // Approximate: 1 triangle = 3 indices
     m_render_metrics.m_frustum_visible_nodes = static_cast<int>(visible_nodes.size());
     m_render_metrics.m_frustum_culled_nodes = static_cast<int>(scene.m_nodes.size() - visible_nodes.size());
     // For now, submit all geometry (actual culling is future optimization).
-    m_render_metrics.m_visible_indices = m_world_index_count;
+    m_render_metrics.m_visible_indices = m_render_metrics.m_total_indices;
     m_render_metrics.m_visible_vertices = m_render_metrics.m_total_vertices;
     m_render_metrics.m_culled_indices = 0;
 
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
     glUseProgram(static_cast<GLuint>(m_world_shader));
     glUniformMatrix4fv(m_mvp_uniform, 1, GL_FALSE, mvp.m);
 
     glBindVertexArray(static_cast<GLuint>(m_world_vao));
-    glDrawElements(
-        GL_TRIANGLES,
-        static_cast<GLsizei>(m_world_index_count),
-        GL_UNSIGNED_INT,
-        nullptr);
+
+    if (m_world_opaque_index_count > 0 && m_world_ibo_opaque != 0U)
+    {
+        glDisable(GL_BLEND);
+        glDepthMask(GL_TRUE);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLuint>(m_world_ibo_opaque));
+        glDrawElements(
+            GL_TRIANGLES,
+            static_cast<GLsizei>(m_world_opaque_index_count),
+            GL_UNSIGNED_INT,
+            nullptr);
+    }
+
+    if (m_world_transparent_index_count > 0 && m_world_ibo_transparent != 0U)
+    {
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDepthMask(GL_FALSE);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLuint>(m_world_ibo_transparent));
+        glDrawElements(
+            GL_TRIANGLES,
+            static_cast<GLsizei>(m_world_transparent_index_count),
+            GL_UNSIGNED_INT,
+            nullptr);
+        glDepthMask(GL_TRUE);
+        glDisable(GL_BLEND);
+    }
+
     glBindVertexArray(0U);
 
     glUseProgram(0U);
-    glDisable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);
 #else
     (void)scene;

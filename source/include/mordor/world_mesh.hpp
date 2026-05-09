@@ -28,7 +28,9 @@ struct WorldVertex
 struct WorldMesh
 {
     std::vector<WorldVertex> m_vertices{};
-    std::vector<uint32_t>   m_indices{};
+    std::vector<uint32_t> m_indices{}; // Combined index stream for diagnostics/tests.
+    std::vector<uint32_t> m_opaque_indices{};
+    std::vector<uint32_t> m_transparent_indices{};
 };
 
 /// Build floor and wall geometry from scene node world bounds and map tile data.

@@ -26,6 +26,7 @@ struct TileGeomInput
 
 void emit_quad(
     WorldMesh&  mesh,
+    std::vector<uint32_t>& index_buffer,
     WorldVertex v0,
     WorldVertex v1,
     WorldVertex v2,
@@ -37,6 +38,12 @@ void emit_quad(
     mesh.m_vertices.push_back(v2);
     mesh.m_vertices.push_back(v3);
     // Two CCW triangles sharing diagonal v0-v2.
+    index_buffer.push_back(base + 0U);
+    index_buffer.push_back(base + 1U);
+    index_buffer.push_back(base + 2U);
+    index_buffer.push_back(base + 0U);
+    index_buffer.push_back(base + 2U);
+    index_buffer.push_back(base + 3U);
     mesh.m_indices.push_back(base + 0U);
     mesh.m_indices.push_back(base + 1U);
     mesh.m_indices.push_back(base + 2U);
@@ -174,7 +181,7 @@ float calculate_occlusion_alpha(
     return max_alpha - ((max_alpha - min_alpha) * fade_strength);
 }
 
-void emit_floor_tile(WorldMesh& mesh, float x0, float z0, float x1, float z1)
+void emit_floor_tile(WorldMesh& mesh, std::vector<uint32_t>& index_buffer, float x0, float z0, float x1, float z1)
 {
     // Flat quad at Y = 0, CCW winding viewed from above (+Y).
     constexpr float r = 0.18F;
@@ -182,6 +189,7 @@ void emit_floor_tile(WorldMesh& mesh, float x0, float z0, float x1, float z1)
     constexpr float b = 0.24F;
     emit_quad(
         mesh,
+        index_buffer,
         WorldVertex{x0, 0.0F, z0, r, g, b},
         WorldVertex{x1, 0.0F, z0, r, g, b},
         WorldVertex{x1, 0.0F, z1, r, g, b},
@@ -190,6 +198,7 @@ void emit_floor_tile(WorldMesh& mesh, float x0, float z0, float x1, float z1)
 
 void emit_wall_tile(
     WorldMesh& mesh,
+    std::vector<uint32_t>& index_buffer,
     float x0,
     float z0,
     float x1,
@@ -208,6 +217,7 @@ void emit_wall_tile(
     constexpr float tb = 0.20F;
     emit_quad(
         mesh,
+        index_buffer,
         WorldVertex{x0, h, z0, tr, tg, tb, alpha},
         WorldVertex{x1, h, z0, tr, tg, tb, alpha},
         WorldVertex{x1, h, z1, tr, tg, tb, alpha},
@@ -221,6 +231,7 @@ void emit_wall_tile(
     {
         emit_quad(
             mesh,
+            index_buffer,
             WorldVertex{x0, 0.0F, z1, fr, fg, fb, alpha},
             WorldVertex{x1, 0.0F, z1, fr, fg, fb, alpha},
             WorldVertex{x1, h,    z1, fr, fg, fb, alpha},
@@ -232,6 +243,7 @@ void emit_wall_tile(
     {
         emit_quad(
             mesh,
+            index_buffer,
             WorldVertex{x1, 0.0F, z0, fr, fg, fb, alpha},
             WorldVertex{x0, 0.0F, z0, fr, fg, fb, alpha},
             WorldVertex{x0, h,    z0, fr, fg, fb, alpha},
@@ -246,6 +258,7 @@ void emit_wall_tile(
     {
         emit_quad(
             mesh,
+            index_buffer,
             WorldVertex{x1, 0.0F, z0, sr, sg, sb, alpha},
             WorldVertex{x1, 0.0F, z1, sr, sg, sb, alpha},
             WorldVertex{x1, h,    z1, sr, sg, sb, alpha},
@@ -257,6 +270,7 @@ void emit_wall_tile(
     {
         emit_quad(
             mesh,
+            index_buffer,
             WorldVertex{x0, 0.0F, z1, sr, sg, sb, alpha},
             WorldVertex{x0, 0.0F, z0, sr, sg, sb, alpha},
             WorldVertex{x0, h,    z0, sr, sg, sb, alpha},
@@ -266,6 +280,7 @@ void emit_wall_tile(
 
 void emit_door_tile(
     WorldMesh& mesh,
+    std::vector<uint32_t>& index_buffer,
     float x0,
     float z0,
     float x1,
@@ -284,6 +299,7 @@ void emit_door_tile(
     constexpr float tb = 0.18F;
     emit_quad(
         mesh,
+        index_buffer,
         WorldVertex{x0, h, z0, tr, tg, tb, alpha},
         WorldVertex{x1, h, z0, tr, tg, tb, alpha},
         WorldVertex{x1, h, z1, tr, tg, tb, alpha},
@@ -296,6 +312,7 @@ void emit_door_tile(
     {
         emit_quad(
             mesh,
+            index_buffer,
             WorldVertex{x0, 0.0F, z1, fr, fg, fb, alpha},
             WorldVertex{x1, 0.0F, z1, fr, fg, fb, alpha},
             WorldVertex{x1, h,    z1, fr, fg, fb, alpha},
@@ -306,6 +323,7 @@ void emit_door_tile(
     {
         emit_quad(
             mesh,
+            index_buffer,
             WorldVertex{x1, 0.0F, z0, fr, fg, fb, alpha},
             WorldVertex{x0, 0.0F, z0, fr, fg, fb, alpha},
             WorldVertex{x0, h,    z0, fr, fg, fb, alpha},
@@ -319,6 +337,7 @@ void emit_door_tile(
     {
         emit_quad(
             mesh,
+            index_buffer,
             WorldVertex{x1, 0.0F, z0, sr, sg, sb, alpha},
             WorldVertex{x1, 0.0F, z1, sr, sg, sb, alpha},
             WorldVertex{x1, h,    z1, sr, sg, sb, alpha},
@@ -329,6 +348,7 @@ void emit_door_tile(
     {
         emit_quad(
             mesh,
+            index_buffer,
             WorldVertex{x0, 0.0F, z1, sr, sg, sb, alpha},
             WorldVertex{x0, 0.0F, z0, sr, sg, sb, alpha},
             WorldVertex{x0, h,    z0, sr, sg, sb, alpha},
@@ -354,6 +374,7 @@ bool tile_blocks_movement(const DungeonMap& map, int col, int row)
 
 void emit_marker_sphere(
     WorldMesh& mesh,
+    std::vector<uint32_t>& index_buffer,
     float center_x,
     float center_z,
     float radius,
@@ -403,6 +424,12 @@ void emit_marker_sphere(
             const uint32_t i2 = base + row1 + static_cast<uint32_t>(slice);
             const uint32_t i3 = base + row1 + static_cast<uint32_t>(slice + 1);
 
+            index_buffer.push_back(i0);
+            index_buffer.push_back(i1);
+            index_buffer.push_back(i2);
+            index_buffer.push_back(i1);
+            index_buffer.push_back(i3);
+            index_buffer.push_back(i2);
             mesh.m_indices.push_back(i0);
             mesh.m_indices.push_back(i1);
             mesh.m_indices.push_back(i2);
@@ -485,6 +512,8 @@ WorldMesh build_world_mesh(
     // Reserve upper-bound capacity: wall = 20 verts + 30 indices, floor = 4 + 6.
     mesh.m_vertices.reserve(tile_inputs.size() * 20);
     mesh.m_indices.reserve(tile_inputs.size() * 30);
+    mesh.m_opaque_indices.reserve(tile_inputs.size() * 24);
+    mesh.m_transparent_indices.reserve(tile_inputs.size() * 12);
 
     for (const TileGeomInput& t : tile_inputs)
     {
@@ -504,10 +533,13 @@ WorldMesh build_world_mesh(
                 camera_z,
                 anchor_x,
                 anchor_z);
+            std::vector<uint32_t>& wall_index_buffer =
+                (alpha < 0.999F) ? mesh.m_transparent_indices : mesh.m_opaque_indices;
             if (t.m_symbol == 'D')
             {
                 emit_door_tile(
                     mesh,
+                    wall_index_buffer,
                     t.m_x0,
                     t.m_z0,
                     t.m_x1,
@@ -522,6 +554,7 @@ WorldMesh build_world_mesh(
             {
                 emit_wall_tile(
                     mesh,
+                    wall_index_buffer,
                     t.m_x0,
                     t.m_z0,
                     t.m_x1,
@@ -535,22 +568,22 @@ WorldMesh build_world_mesh(
         }
         else
         {
-            emit_floor_tile(mesh, t.m_x0, t.m_z0, t.m_x1, t.m_z1);
+            emit_floor_tile(mesh, mesh.m_opaque_indices, t.m_x0, t.m_z0, t.m_x1, t.m_z1);
 
             const float cx = (t.m_x0 + t.m_x1) * 0.5F;
             const float cz = (t.m_z0 + t.m_z1) * 0.5F;
             constexpr float marker_radius = 10.0F;
             if (t.m_symbol == 'A')
             {
-                emit_marker_sphere(mesh, cx, cz, marker_radius, 0.20F, 0.45F, 0.95F); // Player: blue
+                emit_marker_sphere(mesh, mesh.m_opaque_indices, cx, cz, marker_radius, 0.20F, 0.45F, 0.95F); // Player: blue
             }
             else if (t.m_symbol == 'K')
             {
-                emit_marker_sphere(mesh, cx, cz, marker_radius, 0.95F, 0.85F, 0.20F); // Key: yellow
+                emit_marker_sphere(mesh, mesh.m_opaque_indices, cx, cz, marker_radius, 0.95F, 0.85F, 0.20F); // Key: yellow
             }
             else if (t.m_symbol == 'S')
             {
-                emit_marker_sphere(mesh, cx, cz, marker_radius, 0.92F, 0.92F, 0.92F); // Switch: white
+                emit_marker_sphere(mesh, mesh.m_opaque_indices, cx, cz, marker_radius, 0.92F, 0.92F, 0.92F); // Switch: white
             }
         }
     }
