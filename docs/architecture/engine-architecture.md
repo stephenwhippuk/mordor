@@ -97,6 +97,7 @@ Current baseline:
 9. Deterministic room/corridor generation baseline is implemented in the map layer: non-overlapping rectangular rooms are carved into wall-filled maps and connected with L-shaped corridors using seed-driven random generation.
 10. Generator constraints baseline now places deterministic key/switch/door triplets: locked doors are embedded on generated traversal routes with paired key and switch placements emitted as map metadata for follow-on gameplay binding.
 11. Prefab insertion baseline is implemented as deterministic set-piece stamping over carved rooms, with placement metadata emitted for authored scene binding and follow-on runtime integration.
+12. Generation validation baseline verifies reachability/solvability with actionable diagnostics: walkable connectivity is checked with and without door unlock assumptions, and generated key/switch/door constraints are structurally validated before maps are considered valid.
 
 Ordering note:
 1. Deterministic behavior is a hard requirement for reliable testing.

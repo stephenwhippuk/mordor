@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <queue>
 #include <random>
 #include <string>
 #include <utility>
@@ -344,6 +345,98 @@ void place_key_switch_door_constraint(
     });
 }
 
+struct FloodFillResult
+{
+    std::vector<uint8_t> m_visited{};
+    int m_reachable_walkable{0};
+};
+
+bool is_tile_passable_for_validation(const DungeonTile& tile, bool treat_doors_as_open)
+{
+    if (!tile.m_blocks_movement)
+    {
+        return true;
+    }
+    return treat_doors_as_open && tile.m_symbol == 'D';
+}
+
+int find_first_walkable_tile_index(const DungeonMap& map)
+{
+    for (int i = 0; i < static_cast<int>(map.m_tiles.size()); ++i)
+    {
+        if (!map.m_tiles[static_cast<std::size_t>(i)].m_blocks_movement)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+FloodFillResult flood_fill_from_start(const DungeonMap& map, int start_index, bool treat_doors_as_open)
+{
+    FloodFillResult result{};
+    result.m_visited.assign(map.m_tiles.size(), 0U);
+
+    if (start_index < 0 || start_index >= static_cast<int>(map.m_tiles.size()))
+    {
+        return result;
+    }
+
+    std::queue<int> open{};
+    result.m_visited[static_cast<std::size_t>(start_index)] = 1U;
+    open.push(start_index);
+
+    while (!open.empty())
+    {
+        const int idx = open.front();
+        open.pop();
+
+        const DungeonTile& tile = map.m_tiles[static_cast<std::size_t>(idx)];
+        if (!tile.m_blocks_movement)
+        {
+            ++result.m_reachable_walkable;
+        }
+
+        const int col = tile.m_col;
+        const int row = tile.m_row;
+        const int neighbor_cols[4] = {col + 1, col - 1, col, col};
+        const int neighbor_rows[4] = {row, row, row + 1, row - 1};
+
+        for (int n = 0; n < 4; ++n)
+        {
+            const int nc = neighbor_cols[n];
+            const int nr = neighbor_rows[n];
+            if (!is_in_bounds(map, nc, nr))
+            {
+                continue;
+            }
+
+            const int nidx = nr * map.m_width + nc;
+            const std::size_t nidx_u = static_cast<std::size_t>(nidx);
+            if (result.m_visited[nidx_u] != 0U)
+            {
+                continue;
+            }
+
+            const DungeonTile& neighbor = map.m_tiles[nidx_u];
+            if (!is_tile_passable_for_validation(neighbor, treat_doors_as_open))
+            {
+                continue;
+            }
+
+            result.m_visited[nidx_u] = 1U;
+            open.push(nidx);
+        }
+    }
+
+    return result;
+}
+
+void add_issue(DungeonValidationReport& report, const std::string& message)
+{
+    report.m_issues.push_back(message);
+}
+
 } // namespace
 
 bool load_handcrafted_dungeon_map(const std::string& path, DungeonMap& out_map)
@@ -535,6 +628,108 @@ bool generate_room_corridor_dungeon_map(const DungeonGenerationConfig& config, D
 
     out_map = std::move(generated);
     return true;
+}
+
+bool validate_generated_dungeon_map(const DungeonMap& map, DungeonValidationReport& out_report)
+{
+    DungeonValidationReport report{};
+
+    if (map.m_width <= 0 || map.m_height <= 0)
+    {
+        add_issue(report, "map dimensions must be positive");
+        out_report = std::move(report);
+        return false;
+    }
+
+    const std::size_t expected_size =
+        static_cast<std::size_t>(map.m_width) * static_cast<std::size_t>(map.m_height);
+    if (map.m_tiles.size() != expected_size)
+    {
+        add_issue(report, "tile array size does not match map dimensions");
+        out_report = std::move(report);
+        return false;
+    }
+
+    int walkable_count = 0;
+    for (const DungeonTile& tile : map.m_tiles)
+    {
+        if (!tile.m_blocks_movement)
+        {
+            ++walkable_count;
+        }
+    }
+    report.m_walkable_tile_count = walkable_count;
+
+    if (walkable_count == 0)
+    {
+        add_issue(report, "map contains no walkable tiles");
+        out_report = std::move(report);
+        return false;
+    }
+
+    const int start_idx = find_first_walkable_tile_index(map);
+    const FloodFillResult strict_fill = flood_fill_from_start(map, start_idx, false);
+    const FloodFillResult unlocked_fill = flood_fill_from_start(map, start_idx, true);
+
+    report.m_reachable_without_unlocks = strict_fill.m_reachable_walkable;
+    report.m_reachable_with_unlocks = unlocked_fill.m_reachable_walkable;
+    report.m_is_solvable_with_unlocks = (unlocked_fill.m_reachable_walkable == walkable_count);
+
+    if (!report.m_is_solvable_with_unlocks)
+    {
+        add_issue(report, "walkable tiles are disconnected even when doors are treated as open");
+    }
+
+    bool constraints_valid = true;
+    for (const DungeonMap::DoorConstraint& c : map.m_generated_constraints)
+    {
+        if (!is_in_bounds(map, c.m_door_col, c.m_door_row)
+            || !is_in_bounds(map, c.m_key_col, c.m_key_row)
+            || !is_in_bounds(map, c.m_switch_col, c.m_switch_row))
+        {
+            constraints_valid = false;
+            add_issue(report, "constraint coordinates are out of bounds");
+            continue;
+        }
+
+        const DungeonTile& door_tile = map.m_tiles[tile_index(map, c.m_door_col, c.m_door_row)];
+        const DungeonTile& key_tile = map.m_tiles[tile_index(map, c.m_key_col, c.m_key_row)];
+        const DungeonTile& switch_tile = map.m_tiles[tile_index(map, c.m_switch_col, c.m_switch_row)];
+
+        if (c.m_key_id == 0U)
+        {
+            constraints_valid = false;
+            add_issue(report, "constraint key id must be non-zero");
+        }
+        if (door_tile.m_symbol != 'D' || !door_tile.m_blocks_movement)
+        {
+            constraints_valid = false;
+            add_issue(report, "constraint door tile is not a locked door marker");
+        }
+        if (key_tile.m_symbol != 'K' || key_tile.m_blocks_movement)
+        {
+            constraints_valid = false;
+            add_issue(report, "constraint key tile is invalid");
+        }
+        if (switch_tile.m_symbol != 'S' || switch_tile.m_blocks_movement)
+        {
+            constraints_valid = false;
+            add_issue(report, "constraint switch tile is invalid");
+        }
+
+        const int key_idx = c.m_key_row * map.m_width + c.m_key_col;
+        if (key_idx >= 0 && key_idx < static_cast<int>(strict_fill.m_visited.size())
+            && strict_fill.m_visited[static_cast<std::size_t>(key_idx)] == 0U)
+        {
+            constraints_valid = false;
+            add_issue(report, "constraint key is not reachable before unlocks");
+        }
+    }
+
+    report.m_constraints_valid = constraints_valid;
+    report.m_is_valid = report.m_is_solvable_with_unlocks && constraints_valid && report.m_issues.empty();
+    out_report = std::move(report);
+    return out_report.m_is_valid;
 }
 
 } // namespace mordor

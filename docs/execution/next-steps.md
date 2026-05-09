@@ -1,19 +1,18 @@
 # Immediate Next Steps (2-3 Weeks)
 
 ## Goal
-Advance Phase 6 generation baseline from deterministic room/corridor layout to constrained, validated dungeon generation.
+Integrate generated dungeon outputs into runtime systems and begin Phase 7 AI/content expansion groundwork.
 
 ## Work Items
-1. Add reachability and solvability validation pass for generated outputs.
-2. Bind generated key/switch/door metadata into runtime interactable placement.
-3. Bind generated prefab placement metadata into runtime scene/entity spawning.
+1. Bind generated key/switch/door metadata into runtime interactable placement.
+2. Bind generated prefab placement metadata into runtime scene/entity spawning.
+3. Define and implement initial scripted NPC behavior interface (P7-01).
 
 ## Success Criteria
-1. Generated maps are deterministic for fixed seeds and satisfy baseline room/corridor connectivity.
-2. Key/switch/door constraints are generated deterministically and remain stable per seed.
-3. Prefab placement metadata is generated deterministically and remains stable per seed.
-4. Validation pass rejects unsolved or disconnected outputs with actionable failure reasons.
-5. Existing simulation and rendering baselines remain green while generation features land.
+1. Generated map metadata (constraints + prefab placements) is consumed by runtime scene/interactable spawn paths.
+2. Runtime can boot from generated map path with deterministic outputs for fixed seed.
+3. Scripted NPC behavior interface is in place with stable contracts for follow-on behavior tasks.
+4. Existing simulation and rendering baselines remain green while integration and AI scaffolding land.
 
 ## Follow-On
 1. Start integrating generated maps into runtime bootstrap as an optional loading path.

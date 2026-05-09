@@ -1280,6 +1280,75 @@ void test_room_corridor_generation_rules()
     }
 }
 
+void test_generated_dungeon_validation_rules()
+{
+    const DungeonGenerationConfig config{
+        .m_width = 40,
+        .m_height = 30,
+        .m_room_count = 8,
+        .m_min_room_size = 4,
+        .m_max_room_size = 8,
+        .m_seed = 9001U,
+    };
+
+    DungeonMap generated{};
+    check(generate_room_corridor_dungeon_map(config, generated), "validation test map generation should succeed");
+
+    DungeonValidationReport valid_report{};
+    check(validate_generated_dungeon_map(generated, valid_report), "generated map should pass validation");
+    check(valid_report.m_is_valid, "validation report should mark generated map valid");
+    check(valid_report.m_is_solvable_with_unlocks, "generated map should be solvable with unlocks");
+    check(valid_report.m_constraints_valid, "generated map constraints should be valid");
+    check(valid_report.m_walkable_tile_count > 0, "validation report should count walkable tiles");
+    check(valid_report.m_issues.empty(), "valid generated map should have no issues");
+
+    // Failure case: disconnected walkable islands with no doors to bridge.
+    DungeonMap disconnected{};
+    disconnected.m_width = 5;
+    disconnected.m_height = 5;
+    disconnected.m_tiles.reserve(25U);
+    for (int row = 0; row < disconnected.m_height; ++row)
+    {
+        for (int col = 0; col < disconnected.m_width; ++col)
+        {
+            disconnected.m_tiles.push_back(DungeonTile{
+                .m_col = col,
+                .m_row = row,
+                .m_blocks_movement = true,
+                .m_symbol = '#',
+            });
+        }
+    }
+    disconnected.m_tiles[0].m_blocks_movement = false;
+    disconnected.m_tiles[0].m_symbol = '.';
+    disconnected.m_tiles[24].m_blocks_movement = false;
+    disconnected.m_tiles[24].m_symbol = '.';
+
+    DungeonValidationReport disconnected_report{};
+    check(
+        !validate_generated_dungeon_map(disconnected, disconnected_report),
+        "disconnected map should fail validation");
+    check(!disconnected_report.m_is_valid, "disconnected report should be invalid");
+    check(
+        disconnected_report.m_reachable_with_unlocks < disconnected_report.m_walkable_tile_count,
+        "disconnected report should show unreached walkable tiles");
+    check(!disconnected_report.m_issues.empty(), "disconnected map should produce actionable issues");
+
+    // Failure case: malformed generated constraint metadata.
+    DungeonMap bad_constraint = generated;
+    if (!bad_constraint.m_generated_constraints.empty())
+    {
+        bad_constraint.m_generated_constraints[0].m_key_id = 0U;
+    }
+
+    DungeonValidationReport constraint_report{};
+    check(
+        !validate_generated_dungeon_map(bad_constraint, constraint_report),
+        "map with malformed constraint should fail validation");
+    check(!constraint_report.m_constraints_valid, "constraint validation should fail for malformed constraint");
+    check(!constraint_report.m_issues.empty(), "constraint validation failure should report issues");
+}
+
 } // namespace
 
 int main()
@@ -1299,6 +1368,7 @@ int main()
         test_hud_surface_rules();
         test_world_mesh_generation_rules();
         test_room_corridor_generation_rules();
+        test_generated_dungeon_validation_rules();
     }
     catch (const std::exception& ex)
     {
