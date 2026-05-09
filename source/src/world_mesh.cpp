@@ -18,6 +18,7 @@ struct TileGeomInput
     float m_x1{0.0F};
     float m_z1{0.0F};
     bool  m_is_wall{false};
+    char  m_symbol{'.'};
     int   m_sort_key{0}; // payload_index = row * width + col
 };
 
@@ -142,6 +143,117 @@ void emit_wall_tile(WorldMesh& mesh, float x0, float z0, float x1, float z1, flo
         WorldVertex{x0, h,    z1, sr, sg, sb, alpha});
 }
 
+void emit_door_tile(WorldMesh& mesh, float x0, float z0, float x1, float z1, float alpha)
+{
+    const float h = k_wall_height;
+
+    // Brown wooden door palette.
+    constexpr float tr = 0.52F;
+    constexpr float tg = 0.34F;
+    constexpr float tb = 0.18F;
+    emit_quad(
+        mesh,
+        WorldVertex{x0, h, z0, tr, tg, tb, alpha},
+        WorldVertex{x1, h, z0, tr, tg, tb, alpha},
+        WorldVertex{x1, h, z1, tr, tg, tb, alpha},
+        WorldVertex{x0, h, z1, tr, tg, tb, alpha});
+
+    constexpr float fr = 0.43F;
+    constexpr float fg = 0.27F;
+    constexpr float fb = 0.14F;
+    emit_quad(
+        mesh,
+        WorldVertex{x0, 0.0F, z1, fr, fg, fb, alpha},
+        WorldVertex{x1, 0.0F, z1, fr, fg, fb, alpha},
+        WorldVertex{x1, h,    z1, fr, fg, fb, alpha},
+        WorldVertex{x0, h,    z1, fr, fg, fb, alpha});
+
+    emit_quad(
+        mesh,
+        WorldVertex{x1, 0.0F, z0, fr, fg, fb, alpha},
+        WorldVertex{x0, 0.0F, z0, fr, fg, fb, alpha},
+        WorldVertex{x0, h,    z0, fr, fg, fb, alpha},
+        WorldVertex{x1, h,    z0, fr, fg, fb, alpha});
+
+    constexpr float sr = 0.35F;
+    constexpr float sg = 0.22F;
+    constexpr float sb = 0.12F;
+    emit_quad(
+        mesh,
+        WorldVertex{x1, 0.0F, z0, sr, sg, sb, alpha},
+        WorldVertex{x1, 0.0F, z1, sr, sg, sb, alpha},
+        WorldVertex{x1, h,    z1, sr, sg, sb, alpha},
+        WorldVertex{x1, h,    z0, sr, sg, sb, alpha});
+
+    emit_quad(
+        mesh,
+        WorldVertex{x0, 0.0F, z1, sr, sg, sb, alpha},
+        WorldVertex{x0, 0.0F, z0, sr, sg, sb, alpha},
+        WorldVertex{x0, h,    z0, sr, sg, sb, alpha},
+        WorldVertex{x0, h,    z1, sr, sg, sb, alpha});
+}
+
+void emit_marker_sphere(
+    WorldMesh& mesh,
+    float center_x,
+    float center_z,
+    float radius,
+    float r,
+    float g,
+    float b)
+{
+    constexpr int stacks = 6;
+    constexpr int slices = 10;
+    const float center_y = radius + 2.0F;
+
+    const auto base = static_cast<uint32_t>(mesh.m_vertices.size());
+    for (int stack = 0; stack <= stacks; ++stack)
+    {
+        const float v = static_cast<float>(stack) / static_cast<float>(stacks);
+        const float phi = v * 3.1415926535F;
+        const float sin_phi = std::sin(phi);
+        const float cos_phi = std::cos(phi);
+
+        for (int slice = 0; slice <= slices; ++slice)
+        {
+            const float u = static_cast<float>(slice) / static_cast<float>(slices);
+            const float theta = u * 6.283185307F;
+            const float sin_theta = std::sin(theta);
+            const float cos_theta = std::cos(theta);
+
+            mesh.m_vertices.push_back(WorldVertex{
+                center_x + radius * sin_phi * cos_theta,
+                center_y + radius * cos_phi,
+                center_z + radius * sin_phi * sin_theta,
+                r,
+                g,
+                b,
+                1.0F,
+            });
+        }
+    }
+
+    for (int stack = 0; stack < stacks; ++stack)
+    {
+        for (int slice = 0; slice < slices; ++slice)
+        {
+            const uint32_t row0 = static_cast<uint32_t>(stack * (slices + 1));
+            const uint32_t row1 = static_cast<uint32_t>((stack + 1) * (slices + 1));
+            const uint32_t i0 = base + row0 + static_cast<uint32_t>(slice);
+            const uint32_t i1 = base + row0 + static_cast<uint32_t>(slice + 1);
+            const uint32_t i2 = base + row1 + static_cast<uint32_t>(slice);
+            const uint32_t i3 = base + row1 + static_cast<uint32_t>(slice + 1);
+
+            mesh.m_indices.push_back(i0);
+            mesh.m_indices.push_back(i1);
+            mesh.m_indices.push_back(i2);
+            mesh.m_indices.push_back(i1);
+            mesh.m_indices.push_back(i3);
+            mesh.m_indices.push_back(i2);
+        }
+    }
+}
+
 } // namespace
 
 WorldMesh build_world_mesh(const Scene& scene, const DungeonMap& map, float camera_x, float camera_z)
@@ -190,6 +302,7 @@ WorldMesh build_world_mesh(const Scene& scene, const DungeonMap& map, float came
             .m_x1 = node.m_world_bounds.m_max.m_x,
             .m_z1 = node.m_world_bounds.m_max.m_y,
             .m_is_wall  = tile.m_blocks_movement,
+            .m_symbol = tile.m_symbol,
             .m_sort_key = node.m_payload_index,
         });
     }
@@ -211,11 +324,34 @@ WorldMesh build_world_mesh(const Scene& scene, const DungeonMap& map, float came
         if (t.m_is_wall)
         {
             const float alpha = calculate_occlusion_alpha(t.m_x0, t.m_z0, t.m_x1, t.m_z1, camera_x, camera_z);
-            emit_wall_tile(mesh, t.m_x0, t.m_z0, t.m_x1, t.m_z1, alpha);
+            if (t.m_symbol == 'D')
+            {
+                emit_door_tile(mesh, t.m_x0, t.m_z0, t.m_x1, t.m_z1, alpha);
+            }
+            else
+            {
+                emit_wall_tile(mesh, t.m_x0, t.m_z0, t.m_x1, t.m_z1, alpha);
+            }
         }
         else
         {
             emit_floor_tile(mesh, t.m_x0, t.m_z0, t.m_x1, t.m_z1);
+
+            const float cx = (t.m_x0 + t.m_x1) * 0.5F;
+            const float cz = (t.m_z0 + t.m_z1) * 0.5F;
+            constexpr float marker_radius = 10.0F;
+            if (t.m_symbol == 'A')
+            {
+                emit_marker_sphere(mesh, cx, cz, marker_radius, 0.20F, 0.45F, 0.95F); // Player: blue
+            }
+            else if (t.m_symbol == 'K')
+            {
+                emit_marker_sphere(mesh, cx, cz, marker_radius, 0.95F, 0.85F, 0.20F); // Key: yellow
+            }
+            else if (t.m_symbol == 'S')
+            {
+                emit_marker_sphere(mesh, cx, cz, marker_radius, 0.92F, 0.92F, 0.92F); // Switch: white
+            }
         }
     }
 

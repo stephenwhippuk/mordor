@@ -275,6 +275,33 @@ bool try_load_handcrafted_map(
     return false;
 }
 
+bool mark_player_spawn_tile(mordor::DungeonMap& map, int& out_col, int& out_row)
+{
+    for (mordor::DungeonTile& tile : map.m_tiles)
+    {
+        if (!tile.m_blocks_movement && tile.m_symbol == '.')
+        {
+            tile.m_symbol = 'A';
+            out_col = tile.m_col;
+            out_row = tile.m_row;
+            return true;
+        }
+    }
+
+    for (mordor::DungeonTile& tile : map.m_tiles)
+    {
+        if (!tile.m_blocks_movement)
+        {
+            tile.m_symbol = 'A';
+            out_col = tile.m_col;
+            out_row = tile.m_row;
+            return true;
+        }
+    }
+
+    return false;
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -301,19 +328,67 @@ int main(int argc, char** argv)
 
     mordor::DungeonMap handcrafted_map{};
     std::string loaded_map_path{};
-    if (!try_load_handcrafted_map(handcrafted_map, loaded_map_path, argc, argv))
+
+    const mordor::DungeonGenerationConfig generation_config{
+        .m_width = 48,
+        .m_height = 36,
+        .m_room_count = 12,
+        .m_min_room_size = 5,
+        .m_max_room_size = 10,
+        .m_seed = 1337U,
+        .m_enable_key_switch_constraints = true,
+        .m_enable_prefab_insertion = true,
+        .m_prefab_attempt_count = 2,
+    };
+
+    mordor::DungeonValidationReport validation_report{};
+    if (mordor::generate_room_corridor_dungeon_map(generation_config, handcrafted_map)
+        && mordor::validate_generated_dungeon_map(handcrafted_map, validation_report))
     {
-        MORDOR_LOG_CRITICAL("Failed to load handcrafted dungeon map from expected paths");
-        renderer.shutdown();
-        mordor::log::shutdown();
-        return 1;
+        loaded_map_path = "generated(seed=1337)";
+        MORDOR_LOG_INFO(
+            "Generated dungeon map source='{}' size={}x{} walkable={} reachable={} constraints={} prefabs={}",
+            loaded_map_path,
+            handcrafted_map.m_width,
+            handcrafted_map.m_height,
+            validation_report.m_walkable_tile_count,
+            validation_report.m_reachable_with_unlocks,
+            handcrafted_map.m_generated_constraints.size(),
+            handcrafted_map.m_prefab_placements.size());
+    }
+    else
+    {
+        MORDOR_LOG_WARN("Generated dungeon failed validation; falling back to handcrafted map");
+        for (const std::string& issue : validation_report.m_issues)
+        {
+            MORDOR_LOG_WARN("generation_issue: {}", issue);
+        }
+
+        if (!try_load_handcrafted_map(handcrafted_map, loaded_map_path, argc, argv))
+        {
+            MORDOR_LOG_CRITICAL("Failed to load handcrafted dungeon map from expected paths");
+            renderer.shutdown();
+            mordor::log::shutdown();
+            return 1;
+        }
+
+        MORDOR_LOG_INFO(
+            "Loaded handcrafted dungeon map path='{}' size={}x{}",
+            loaded_map_path,
+            handcrafted_map.m_width,
+            handcrafted_map.m_height);
     }
 
-    MORDOR_LOG_INFO(
-        "Loaded handcrafted dungeon map path='{}' size={}x{}",
-        loaded_map_path,
-        handcrafted_map.m_width,
-        handcrafted_map.m_height);
+    int player_col = -1;
+    int player_row = -1;
+    if (mark_player_spawn_tile(handcrafted_map, player_col, player_row))
+    {
+        MORDOR_LOG_INFO("Placed player marker tile at ({}, {})", player_col, player_row);
+    }
+    else
+    {
+        MORDOR_LOG_WARN("Could not place player marker tile (no walkable tiles found)");
+    }
 
     mordor::Scene world_scene{};
     if (!mordor::build_scene_from_dungeon_map(handcrafted_map, world_scene))
