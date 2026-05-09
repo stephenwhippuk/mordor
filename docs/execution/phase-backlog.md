@@ -85,7 +85,8 @@ Must be resolved before rotation is considered production-quality. Tracked for P
 1. Wall geometry is emitted per blocked tile and still includes interior side faces between adjacent wall tiles; this increases polygon count and can surface as visual artifacts when occlusion fading is active.
 2. Occlusion fade reference is not yet aligned to a clearly exposed party/actor position contract, making behavior appear camera-driven in quick playtests.
 3. Target occlusion intent: fade only geometry between camera and active actor/party anchor; never fade geometry behind the anchor unless another gameplay visibility system requires it.
-4. Resolve all items before treating rendering readability/performance as production-ready for larger maps.
+4. Occlusion must be radius-gated so walls outside the effective blocking radius are ignored; expected steady-state is typically one to two faded wall segments except at low camera pitch foreground stacks.
+5. Resolve all items before treating rendering readability/performance as production-ready for larger maps.
 
 ## Phase 6 Backlog
 
