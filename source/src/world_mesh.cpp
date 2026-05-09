@@ -19,6 +19,8 @@ struct TileGeomInput
     float m_z1{0.0F};
     bool  m_is_wall{false};
     char  m_symbol{'.'};
+    int   m_col{0};
+    int   m_row{0};
     int   m_sort_key{0}; // payload_index = row * width + col
 };
 
@@ -43,6 +45,61 @@ void emit_quad(
     mesh.m_indices.push_back(base + 3U);
 }
 
+bool segment_intersects_rect_2d(
+    float x0,
+    float z0,
+    float x1,
+    float z1,
+    float min_x,
+    float min_z,
+    float max_x,
+    float max_z)
+{
+    float t0 = 0.0F;
+    float t1 = 1.0F;
+
+    const float dx = x1 - x0;
+    const float dz = z1 - z0;
+
+    const auto clip = [&t0, &t1](float p, float q) {
+        if (std::fabs(p) <= 1.0e-6F)
+        {
+            return q >= 0.0F;
+        }
+
+        const float r = q / p;
+        if (p < 0.0F)
+        {
+            if (r > t1)
+            {
+                return false;
+            }
+            if (r > t0)
+            {
+                t0 = r;
+            }
+        }
+        else
+        {
+            if (r < t0)
+            {
+                return false;
+            }
+            if (r < t1)
+            {
+                t1 = r;
+            }
+        }
+
+        return true;
+    };
+
+    return clip(-dx, x0 - min_x)
+        && clip(dx, max_x - x0)
+        && clip(-dz, z0 - min_z)
+        && clip(dz, max_z - z0);
+}
+
 float calculate_occlusion_alpha(
     float wall_x0,
     float wall_z0,
@@ -55,6 +112,20 @@ float calculate_occlusion_alpha(
 {
     const float wall_cx = (wall_x0 + wall_x1) * 0.5F;
     const float wall_cz = (wall_z0 + wall_z1) * 0.5F;
+
+    constexpr float occluder_padding = 2.0F;
+    if (!segment_intersects_rect_2d(
+            camera_x,
+            camera_z,
+            anchor_x,
+            anchor_z,
+            wall_x0 - occluder_padding,
+            wall_z0 - occluder_padding,
+            wall_x1 + occluder_padding,
+            wall_z1 + occluder_padding))
+    {
+        return 1.0F;
+    }
 
     const float seg_dx = anchor_x - camera_x;
     const float seg_dz = anchor_z - camera_z;
@@ -117,7 +188,17 @@ void emit_floor_tile(WorldMesh& mesh, float x0, float z0, float x1, float z1)
         WorldVertex{x0, 0.0F, z1, r, g, b});
 }
 
-void emit_wall_tile(WorldMesh& mesh, float x0, float z0, float x1, float z1, float alpha)
+void emit_wall_tile(
+    WorldMesh& mesh,
+    float x0,
+    float z0,
+    float x1,
+    float z1,
+    float alpha,
+    bool emit_south_face,
+    bool emit_north_face,
+    bool emit_east_face,
+    bool emit_west_face)
 {
     const float h = k_wall_height;
 
@@ -136,42 +217,64 @@ void emit_wall_tile(WorldMesh& mesh, float x0, float z0, float x1, float z1, flo
     constexpr float fr = 0.50F;
     constexpr float fg = 0.16F;
     constexpr float fb = 0.16F;
-    emit_quad(
-        mesh,
-        WorldVertex{x0, 0.0F, z1, fr, fg, fb, alpha},
-        WorldVertex{x1, 0.0F, z1, fr, fg, fb, alpha},
-        WorldVertex{x1, h,    z1, fr, fg, fb, alpha},
-        WorldVertex{x0, h,    z1, fr, fg, fb, alpha});
+    if (emit_south_face)
+    {
+        emit_quad(
+            mesh,
+            WorldVertex{x0, 0.0F, z1, fr, fg, fb, alpha},
+            WorldVertex{x1, 0.0F, z1, fr, fg, fb, alpha},
+            WorldVertex{x1, h,    z1, fr, fg, fb, alpha},
+            WorldVertex{x0, h,    z1, fr, fg, fb, alpha});
+    }
 
     // North face (Z-).
-    emit_quad(
-        mesh,
-        WorldVertex{x1, 0.0F, z0, fr, fg, fb, alpha},
-        WorldVertex{x0, 0.0F, z0, fr, fg, fb, alpha},
-        WorldVertex{x0, h,    z0, fr, fg, fb, alpha},
-        WorldVertex{x1, h,    z0, fr, fg, fb, alpha});
+    if (emit_north_face)
+    {
+        emit_quad(
+            mesh,
+            WorldVertex{x1, 0.0F, z0, fr, fg, fb, alpha},
+            WorldVertex{x0, 0.0F, z0, fr, fg, fb, alpha},
+            WorldVertex{x0, h,    z0, fr, fg, fb, alpha},
+            WorldVertex{x1, h,    z0, fr, fg, fb, alpha});
+    }
 
     // East face (X+).
     constexpr float sr = 0.40F;
     constexpr float sg = 0.13F;
     constexpr float sb = 0.13F;
-    emit_quad(
-        mesh,
-        WorldVertex{x1, 0.0F, z0, sr, sg, sb, alpha},
-        WorldVertex{x1, 0.0F, z1, sr, sg, sb, alpha},
-        WorldVertex{x1, h,    z1, sr, sg, sb, alpha},
-        WorldVertex{x1, h,    z0, sr, sg, sb, alpha});
+    if (emit_east_face)
+    {
+        emit_quad(
+            mesh,
+            WorldVertex{x1, 0.0F, z0, sr, sg, sb, alpha},
+            WorldVertex{x1, 0.0F, z1, sr, sg, sb, alpha},
+            WorldVertex{x1, h,    z1, sr, sg, sb, alpha},
+            WorldVertex{x1, h,    z0, sr, sg, sb, alpha});
+    }
 
     // West face (X-).
-    emit_quad(
-        mesh,
-        WorldVertex{x0, 0.0F, z1, sr, sg, sb, alpha},
-        WorldVertex{x0, 0.0F, z0, sr, sg, sb, alpha},
-        WorldVertex{x0, h,    z0, sr, sg, sb, alpha},
-        WorldVertex{x0, h,    z1, sr, sg, sb, alpha});
+    if (emit_west_face)
+    {
+        emit_quad(
+            mesh,
+            WorldVertex{x0, 0.0F, z1, sr, sg, sb, alpha},
+            WorldVertex{x0, 0.0F, z0, sr, sg, sb, alpha},
+            WorldVertex{x0, h,    z0, sr, sg, sb, alpha},
+            WorldVertex{x0, h,    z1, sr, sg, sb, alpha});
+    }
 }
 
-void emit_door_tile(WorldMesh& mesh, float x0, float z0, float x1, float z1, float alpha)
+void emit_door_tile(
+    WorldMesh& mesh,
+    float x0,
+    float z0,
+    float x1,
+    float z1,
+    float alpha,
+    bool emit_south_face,
+    bool emit_north_face,
+    bool emit_east_face,
+    bool emit_west_face)
 {
     const float h = k_wall_height;
 
@@ -189,36 +292,64 @@ void emit_door_tile(WorldMesh& mesh, float x0, float z0, float x1, float z1, flo
     constexpr float fr = 0.43F;
     constexpr float fg = 0.27F;
     constexpr float fb = 0.14F;
-    emit_quad(
-        mesh,
-        WorldVertex{x0, 0.0F, z1, fr, fg, fb, alpha},
-        WorldVertex{x1, 0.0F, z1, fr, fg, fb, alpha},
-        WorldVertex{x1, h,    z1, fr, fg, fb, alpha},
-        WorldVertex{x0, h,    z1, fr, fg, fb, alpha});
+    if (emit_south_face)
+    {
+        emit_quad(
+            mesh,
+            WorldVertex{x0, 0.0F, z1, fr, fg, fb, alpha},
+            WorldVertex{x1, 0.0F, z1, fr, fg, fb, alpha},
+            WorldVertex{x1, h,    z1, fr, fg, fb, alpha},
+            WorldVertex{x0, h,    z1, fr, fg, fb, alpha});
+    }
 
-    emit_quad(
-        mesh,
-        WorldVertex{x1, 0.0F, z0, fr, fg, fb, alpha},
-        WorldVertex{x0, 0.0F, z0, fr, fg, fb, alpha},
-        WorldVertex{x0, h,    z0, fr, fg, fb, alpha},
-        WorldVertex{x1, h,    z0, fr, fg, fb, alpha});
+    if (emit_north_face)
+    {
+        emit_quad(
+            mesh,
+            WorldVertex{x1, 0.0F, z0, fr, fg, fb, alpha},
+            WorldVertex{x0, 0.0F, z0, fr, fg, fb, alpha},
+            WorldVertex{x0, h,    z0, fr, fg, fb, alpha},
+            WorldVertex{x1, h,    z0, fr, fg, fb, alpha});
+    }
 
     constexpr float sr = 0.35F;
     constexpr float sg = 0.22F;
     constexpr float sb = 0.12F;
-    emit_quad(
-        mesh,
-        WorldVertex{x1, 0.0F, z0, sr, sg, sb, alpha},
-        WorldVertex{x1, 0.0F, z1, sr, sg, sb, alpha},
-        WorldVertex{x1, h,    z1, sr, sg, sb, alpha},
-        WorldVertex{x1, h,    z0, sr, sg, sb, alpha});
+    if (emit_east_face)
+    {
+        emit_quad(
+            mesh,
+            WorldVertex{x1, 0.0F, z0, sr, sg, sb, alpha},
+            WorldVertex{x1, 0.0F, z1, sr, sg, sb, alpha},
+            WorldVertex{x1, h,    z1, sr, sg, sb, alpha},
+            WorldVertex{x1, h,    z0, sr, sg, sb, alpha});
+    }
 
-    emit_quad(
-        mesh,
-        WorldVertex{x0, 0.0F, z1, sr, sg, sb, alpha},
-        WorldVertex{x0, 0.0F, z0, sr, sg, sb, alpha},
-        WorldVertex{x0, h,    z0, sr, sg, sb, alpha},
-        WorldVertex{x0, h,    z1, sr, sg, sb, alpha});
+    if (emit_west_face)
+    {
+        emit_quad(
+            mesh,
+            WorldVertex{x0, 0.0F, z1, sr, sg, sb, alpha},
+            WorldVertex{x0, 0.0F, z0, sr, sg, sb, alpha},
+            WorldVertex{x0, h,    z0, sr, sg, sb, alpha},
+            WorldVertex{x0, h,    z1, sr, sg, sb, alpha});
+    }
+}
+
+bool tile_blocks_movement(const DungeonMap& map, int col, int row)
+{
+    if (col < 0 || row < 0 || col >= map.m_width || row >= map.m_height)
+    {
+        return false;
+    }
+
+    const std::size_t idx = static_cast<std::size_t>((row * map.m_width) + col);
+    if (idx >= map.m_tiles.size())
+    {
+        return false;
+    }
+
+    return map.m_tiles[idx].m_blocks_movement;
 }
 
 void emit_marker_sphere(
@@ -337,6 +468,8 @@ WorldMesh build_world_mesh(
             .m_z1 = node.m_world_bounds.m_max.m_y,
             .m_is_wall  = tile.m_blocks_movement,
             .m_symbol = tile.m_symbol,
+            .m_col = tile.m_col,
+            .m_row = tile.m_row,
             .m_sort_key = node.m_payload_index,
         });
     }
@@ -357,6 +490,11 @@ WorldMesh build_world_mesh(
     {
         if (t.m_is_wall)
         {
+            const bool has_north_wall = tile_blocks_movement(map, t.m_col, t.m_row - 1);
+            const bool has_south_wall = tile_blocks_movement(map, t.m_col, t.m_row + 1);
+            const bool has_east_wall = tile_blocks_movement(map, t.m_col + 1, t.m_row);
+            const bool has_west_wall = tile_blocks_movement(map, t.m_col - 1, t.m_row);
+
             const float alpha = calculate_occlusion_alpha(
                 t.m_x0,
                 t.m_z0,
@@ -368,11 +506,31 @@ WorldMesh build_world_mesh(
                 anchor_z);
             if (t.m_symbol == 'D')
             {
-                emit_door_tile(mesh, t.m_x0, t.m_z0, t.m_x1, t.m_z1, alpha);
+                emit_door_tile(
+                    mesh,
+                    t.m_x0,
+                    t.m_z0,
+                    t.m_x1,
+                    t.m_z1,
+                    alpha,
+                    !has_south_wall,
+                    !has_north_wall,
+                    !has_east_wall,
+                    !has_west_wall);
             }
             else
             {
-                emit_wall_tile(mesh, t.m_x0, t.m_z0, t.m_x1, t.m_z1, alpha);
+                emit_wall_tile(
+                    mesh,
+                    t.m_x0,
+                    t.m_z0,
+                    t.m_x1,
+                    t.m_z1,
+                    alpha,
+                    !has_south_wall,
+                    !has_north_wall,
+                    !has_east_wall,
+                    !has_west_wall);
             }
         }
         else

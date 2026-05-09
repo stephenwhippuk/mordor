@@ -321,6 +321,19 @@ mordor::Float3 tile_center_world(mordor::TileCoord tile)
     };
 }
 
+mordor::Float3 camera_eye_world(const mordor::CameraState& camera)
+{
+    const float yaw = camera.m_rotation_radians;
+    const float cos_pitch = std::cos(camera.m_pitch_radians);
+    const float sin_pitch = std::sin(camera.m_pitch_radians);
+
+    return mordor::Float3{
+        .m_x = camera.m_x + std::sin(yaw) * cos_pitch * camera.m_distance,
+        .m_y = camera.m_y + std::cos(yaw) * cos_pitch * camera.m_distance,
+        .m_z = sin_pitch * camera.m_distance,
+    };
+}
+
 bool try_move_player_marker(
     mordor::DungeonMap& map,
     const mordor::OccupancyGrid& occupancy,
@@ -476,12 +489,13 @@ int main(int argc, char** argv)
         world_scene.m_spatial_index.m_cells.size());
 
     const mordor::CameraState initial_camera = renderer.camera_state();
+    const mordor::Float3 initial_camera_eye = camera_eye_world(initial_camera);
     const mordor::Float3 initial_player_world = tile_center_world(active_player_tile);
     const mordor::WorldMesh world_mesh = mordor::build_world_mesh(
         world_scene,
         handcrafted_map,
-        initial_camera.m_x,
-        initial_camera.m_y,
+        initial_camera_eye.m_x,
+        initial_camera_eye.m_y,
         initial_player_world.m_x,
         initial_player_world.m_y);
     if (world_mesh.m_vertices.empty() || world_mesh.m_indices.empty())
@@ -497,8 +511,8 @@ int main(int argc, char** argv)
         world_mesh.m_indices.size());
     renderer.load_world_mesh(world_mesh);
     world.m_has_occlusion_snapshot = true;
-    world.m_last_occlusion_camera_x = initial_camera.m_x;
-    world.m_last_occlusion_camera_y = initial_camera.m_y;
+    world.m_last_occlusion_camera_x = initial_camera_eye.m_x;
+    world.m_last_occlusion_camera_y = initial_camera_eye.m_y;
     world.m_last_occlusion_player_tile = active_player_tile;
 
 
@@ -645,11 +659,12 @@ int main(int argc, char** argv)
         }
 
         const mordor::CameraState camera_for_occlusion = renderer.camera_state();
+        const mordor::Float3 camera_eye_for_occlusion = camera_eye_world(camera_for_occlusion);
         constexpr float camera_delta_epsilon = 1.0F;
         const bool camera_changed =
             !world.m_has_occlusion_snapshot
-            || std::fabs(camera_for_occlusion.m_x - world.m_last_occlusion_camera_x) > camera_delta_epsilon
-            || std::fabs(camera_for_occlusion.m_y - world.m_last_occlusion_camera_y) > camera_delta_epsilon;
+            || std::fabs(camera_eye_for_occlusion.m_x - world.m_last_occlusion_camera_x) > camera_delta_epsilon
+            || std::fabs(camera_eye_for_occlusion.m_y - world.m_last_occlusion_camera_y) > camera_delta_epsilon;
 
         const bool player_changed =
             !world.m_has_occlusion_snapshot
@@ -663,16 +678,16 @@ int main(int argc, char** argv)
             const mordor::WorldMesh occlusion_mesh = mordor::build_world_mesh(
                 world_scene,
                 handcrafted_map,
-                camera_for_occlusion.m_x,
-                camera_for_occlusion.m_y,
+                camera_eye_for_occlusion.m_x,
+                camera_eye_for_occlusion.m_y,
                 player_anchor_world.m_x,
                 player_anchor_world.m_y);
             if (!occlusion_mesh.m_vertices.empty() && !occlusion_mesh.m_indices.empty())
             {
                 renderer.load_world_mesh(occlusion_mesh);
                 world.m_has_occlusion_snapshot = true;
-                world.m_last_occlusion_camera_x = camera_for_occlusion.m_x;
-                world.m_last_occlusion_camera_y = camera_for_occlusion.m_y;
+                world.m_last_occlusion_camera_x = camera_eye_for_occlusion.m_x;
+                world.m_last_occlusion_camera_y = camera_eye_for_occlusion.m_y;
                 world.m_last_occlusion_player_tile = active_player_tile;
             }
         }
