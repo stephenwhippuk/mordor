@@ -18,6 +18,7 @@
 #include <cstdlib>
 #include <exception>
 #include <iostream>
+#include <queue>
 #include <string>
 
 namespace {
@@ -1088,6 +1089,120 @@ void test_world_mesh_generation_rules()
     check(found_raised_wall_vertex, "world mesh should contain raised vertices for wall geometry");
 }
 
+void test_room_corridor_generation_rules()
+{
+    const DungeonGenerationConfig config{
+        .m_width = 40,
+        .m_height = 30,
+        .m_room_count = 8,
+        .m_min_room_size = 4,
+        .m_max_room_size = 8,
+        .m_seed = 4242U,
+    };
+
+    DungeonMap generated_a{};
+    DungeonMap generated_b{};
+    check(generate_room_corridor_dungeon_map(config, generated_a), "generator should succeed for valid config");
+    check(generate_room_corridor_dungeon_map(config, generated_b), "generator should be repeatable for valid config");
+
+    check(generated_a.m_width == config.m_width, "generated map should keep configured width");
+    check(generated_a.m_height == config.m_height, "generated map should keep configured height");
+    check(
+        generated_a.m_tiles.size() == static_cast<std::size_t>(config.m_width * config.m_height),
+        "generated map should fill full tile grid");
+
+    check(generated_a.m_tiles.size() == generated_b.m_tiles.size(), "deterministic runs should have same tile count");
+
+    std::size_t floor_count = 0;
+    std::size_t wall_count = 0;
+    for (std::size_t i = 0; i < generated_a.m_tiles.size(); ++i)
+    {
+        const DungeonTile& ta = generated_a.m_tiles[i];
+        const DungeonTile& tb = generated_b.m_tiles[i];
+
+        check(ta.m_symbol == tb.m_symbol, "deterministic runs should have identical tile symbols");
+        check(ta.m_blocks_movement == tb.m_blocks_movement, "deterministic runs should match movement blockers");
+
+        if (ta.m_blocks_movement)
+        {
+            ++wall_count;
+        }
+        else
+        {
+            ++floor_count;
+        }
+    }
+
+    check(floor_count > 0, "generated map should include walkable floor tiles");
+    check(wall_count > 0, "generated map should include wall tiles");
+
+    // Baseline connectivity: all floor tiles are reachable from the first floor tile.
+    int start_idx = -1;
+    for (int i = 0; i < static_cast<int>(generated_a.m_tiles.size()); ++i)
+    {
+        if (!generated_a.m_tiles[static_cast<std::size_t>(i)].m_blocks_movement)
+        {
+            start_idx = i;
+            break;
+        }
+    }
+    check(start_idx >= 0, "generated map should contain a floor tile start for connectivity test");
+
+    if (start_idx >= 0)
+    {
+        std::vector<uint8_t> visited(generated_a.m_tiles.size(), 0U);
+        std::queue<int> open{};
+        visited[static_cast<std::size_t>(start_idx)] = 1U;
+        open.push(start_idx);
+
+        auto in_bounds = [&generated_a](int col, int row) {
+            return col >= 0 && row >= 0 && col < generated_a.m_width && row < generated_a.m_height;
+        };
+
+        std::size_t reached_floor_count = 0;
+        while (!open.empty())
+        {
+            const int idx = open.front();
+            open.pop();
+
+            const DungeonTile& tile = generated_a.m_tiles[static_cast<std::size_t>(idx)];
+            if (!tile.m_blocks_movement)
+            {
+                ++reached_floor_count;
+            }
+
+            const int col = tile.m_col;
+            const int row = tile.m_row;
+            const int neighbor_cols[4] = {col + 1, col - 1, col, col};
+            const int neighbor_rows[4] = {row, row, row + 1, row - 1};
+
+            for (int n = 0; n < 4; ++n)
+            {
+                const int nc = neighbor_cols[n];
+                const int nr = neighbor_rows[n];
+                if (!in_bounds(nc, nr))
+                {
+                    continue;
+                }
+
+                const int nidx = nr * generated_a.m_width + nc;
+                const std::size_t nidx_u = static_cast<std::size_t>(nidx);
+                if (visited[nidx_u] != 0U || generated_a.m_tiles[nidx_u].m_blocks_movement)
+                {
+                    continue;
+                }
+
+                visited[nidx_u] = 1U;
+                open.push(nidx);
+            }
+        }
+
+        check(
+            reached_floor_count == floor_count,
+            "generated floor tiles should be connected by room/corridor carve path");
+    }
+}
+
 } // namespace
 
 int main()
@@ -1106,6 +1221,7 @@ int main()
         test_inventory_pipeline_rules();
         test_hud_surface_rules();
         test_world_mesh_generation_rules();
+        test_room_corridor_generation_rules();
     }
     catch (const std::exception& ex)
     {
