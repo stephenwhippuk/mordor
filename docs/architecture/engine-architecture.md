@@ -94,6 +94,7 @@ Current baseline:
 6. Directional hearing primitives evaluate audibility from source/listener tiles with deterministic distance falloff, facing bias, and occupancy-based occlusion attenuation.
 7. Fog-of-war state now tracks visible versus explored cells and refreshes visibility from observer tiles using LOS-gated simulation queries.
 8. Perception debug-tile builders produce deterministic overlay payloads that map LOS, hearing, and fog results into renderer-consumable debug geometry.
+9. Deterministic room/corridor generation baseline is implemented in the map layer: non-overlapping rectangular rooms are carved into wall-filled maps and connected with L-shaped corridors using seed-driven random generation.
 
 Ordering note:
 1. Deterministic behavior is a hard requirement for reliable testing.

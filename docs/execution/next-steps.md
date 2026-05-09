@@ -1,20 +1,21 @@
 # Immediate Next Steps (2-3 Weeks)
 
 ## Goal
-Complete Phase 5 rendering baseline by adding occlusion handling and performance metrics.
+Advance Phase 6 generation baseline from deterministic room/corridor layout to constrained, validated dungeon generation.
 
 ## Work Items
-1. Add wall fade/hide occlusion handling so foreground geometry does not block practical selection.
-2. Add render submission and culling metrics for baseline performance tracking.
+1. Extend generator output with key-lock and switch-door placement constraints.
+2. Add prefab insertion hooks for authored set-piece rooms.
+3. Add reachability and solvability validation pass for generated outputs.
 
 ## Success Criteria
-1. Handcrafted map renders as stable 3D floor/wall geometry from an isometric angle.
-2. Mouse interactions can select intended entities/tiles in cluttered scenes.
-3. Occlusion handling preserves readability without globally hiding world geometry.
-4. Existing command/ability/inventory/HUD baselines remain green while renderer changes land.
+1. Generated maps are deterministic for fixed seeds and satisfy baseline room/corridor connectivity.
+2. Key progression constraints can be generated without producing dead-end progression states.
+3. Validation pass rejects unsolved or disconnected outputs with actionable failure reasons.
+4. Existing simulation and rendering baselines remain green while generation features land.
 
 ## Follow-On
-1. Begin Phase 6 generation once rendering and mouse interaction contracts are stable.
+1. Start integrating generated maps into runtime bootstrap as an optional loading path.
 
 ## Carry-Over Rendering Issues (From Quick Playtest)
 1. Wall mesh over-generation: world mesh currently emits full wall side faces per blocked tile, including interior faces between adjacent wall tiles. This creates unnecessary polygons and becomes visible during occlusion fades.

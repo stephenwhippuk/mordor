@@ -179,6 +179,7 @@ if(BUILD_TESTING)
         src/inventory_pipeline.cpp
         src/interactions.cpp
         src/key_switch.cpp
+        src/map.cpp
         src/occupancy.cpp
         src/party_commands.cpp
         src/perception_debug.cpp
