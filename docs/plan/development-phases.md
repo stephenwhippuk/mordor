@@ -57,7 +57,18 @@ Deliverables:
 Exit criteria:
 1. Complete exploration-interaction-loot loop is playable.
 
-### Phase 5: Dungeon Generation v1
+### Phase 5: Rendering Engine and Interaction Readability
+Deliverables:
+1. Shader/VBO-based 3D map rendering path for walls and floors.
+2. Tunable isometric-perspective camera rig.
+3. Mouse-driven tile/entity selection and picking.
+4. Occlusion-aware wall fade/hide strategy for interaction readability.
+5. Frustum-culling and render submission metrics.
+
+Exit criteria:
+1. Player can reliably select intended targets in 3D scenes without foreground wall occlusion blocking interaction readability.
+
+### Phase 6: Dungeon Generation v1
 Deliverables:
 1. Rule-based room and corridor generator.
 2. Key-lock and switch-door constraint support.
@@ -67,7 +78,7 @@ Deliverables:
 Exit criteria:
 1. Generated dungeons are mechanically coherent and completable.
 
-### Phase 6: AI and Content Expansion
+### Phase 7: AI and Content Expansion
 Deliverables:
 1. Scripted NPC behavior framework.
 2. Investigate/patrol/chase/disengage tactical behavior.
@@ -76,7 +87,7 @@ Deliverables:
 Exit criteria:
 1. Stable session with multiple encounter patterns and no progression blockers.
 
-### Phase 7: Tooling and Hardening
+### Phase 8: Tooling and Hardening
 Deliverables:
 1. Authoring helpers and content validators.
 2. Save/load reliability pass.

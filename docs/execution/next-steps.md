@@ -1,17 +1,20 @@
 # Immediate Next Steps (2-3 Weeks)
 
 ## Goal
-Start Phase 5 implementation by turning current command/ability/inventory scaffolding into generation-ready systems.
+Start Phase 5 implementation by replacing the debug draw path with a proper 3D renderer that preserves interaction readability.
 
 ## Work Items
-1. Implement room/corridor generation algorithm baseline.
-2. Add generator constraints for key-lock and switch-door progression paths.
-3. Extend integration coverage across party commands, abilities, inventory item use, and HUD surfaces before generation iteration.
+1. Implement shader/VBO floor and wall rendering from map data.
+2. Implement angled isometric-perspective camera controls with tunable defaults.
+3. Add mouse-driven tile/entity selection and stable picking resolution.
+4. Add wall fade/hide occlusion handling so foreground geometry does not block practical selection.
+5. Add render submission and culling metrics for baseline performance tracking.
 
 ## Success Criteria
-1. Generated dungeon layouts produce deterministic room/corridor topology for fixed seeds.
-2. Generated progression gates preserve solvable key-lock and switch-door paths.
-3. Existing command/ability/inventory/HUD baselines remain green under expanded test coverage.
+1. Handcrafted map renders as stable 3D floor/wall geometry from an isometric angle.
+2. Mouse interactions can select intended entities/tiles in cluttered scenes.
+3. Occlusion handling preserves readability without globally hiding world geometry.
+4. Existing command/ability/inventory/HUD baselines remain green while renderer changes land.
 
 ## Follow-On
-1. Add prefab insertion and full solvability validation after generator baseline stabilizes.
+1. Begin Phase 6 generation once rendering and mouse interaction contracts are stable.
