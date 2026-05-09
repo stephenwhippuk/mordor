@@ -80,6 +80,12 @@ Must be resolved before rotation is considered production-quality. Tracked for P
 | P5-04 | Implement occlusion-aware wall fade/hide for interaction readability | P3-01, P5-02, P5-03 | High | Complete | plan/rendering-engine-plan.md |
 | P5-05 | Add frustum culling and render submission metrics | P1-08, P5-01 | Medium | Complete | plan/rendering-engine-plan.md |
 
+### Known Limitations — Post P5
+
+1. Wall geometry is emitted per blocked tile and still includes interior side faces between adjacent wall tiles; this increases polygon count and can surface as visual artifacts when occlusion fading is active.
+2. Occlusion fade reference is not yet aligned to a clearly exposed party/actor position contract, making behavior appear camera-driven in quick playtests.
+3. Resolve both items before treating rendering readability/performance as production-ready for larger maps.
+
 ## Phase 6 Backlog
 
 | Task ID | Description | Depends On | Priority | Status | Deliverable Link |
