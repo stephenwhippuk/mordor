@@ -1097,18 +1097,79 @@ void test_world_mesh_generation_rules()
     Scene symbol_scene{};
     check(build_scene_from_dungeon_map(symbol_map, symbol_scene), "scene build should succeed for symbol mesh tests");
 
+    const SceneNodeId key_marker_node = find_first_scene_node_by_symbol(symbol_scene, 'K');
+    const SceneNodeId switch_marker_node = find_first_scene_node_by_symbol(symbol_scene, 'S');
+    check(key_marker_node != k_invalid_scene_node_id, "scene should emit a marker node for key symbol K");
+    check(switch_marker_node != k_invalid_scene_node_id, "scene should emit a marker node for switch symbol S");
+
+    const uint32_t generic_runtime_visual_flags = scene_node_category_bits(SceneNodeCategory::DynamicAttachment)
+        | scene_node_category_bits(SceneNodeCategory::Renderable)
+        | scene_node_category_bits(SceneNodeCategory::Pickable);
+    const SceneNodeId item_visual_node = add_runtime_visual_node(
+        symbol_scene,
+        'I',
+        Float3{
+            .m_x = 2.5F * k_scene_tile_world_size,
+            .m_y = 1.5F * k_scene_tile_world_size,
+            .m_z = 0.0F,
+        },
+        generic_runtime_visual_flags,
+        -1);
+    const SceneNodeId npc_visual_node = add_runtime_visual_node(
+        symbol_scene,
+        'N',
+        Float3{
+            .m_x = 1.5F * k_scene_tile_world_size,
+            .m_y = 1.5F * k_scene_tile_world_size,
+            .m_z = 0.0F,
+        },
+        generic_runtime_visual_flags,
+        -1);
+    check(item_visual_node != k_invalid_scene_node_id, "runtime should be able to add a generic item visual node");
+    check(npc_visual_node != k_invalid_scene_node_id, "runtime should be able to add a generic npc visual node");
+
+    const SceneNode* item_visual = find_scene_node(symbol_scene, item_visual_node);
+    const SceneNode* npc_visual = find_scene_node(symbol_scene, npc_visual_node);
+    check(item_visual != nullptr && item_visual->m_debug_symbol == 'I', "item runtime visual node should preserve its render symbol");
+    check(npc_visual != nullptr && npc_visual->m_debug_symbol == 'N', "npc runtime visual node should preserve its render symbol");
+
+    const SceneNodeId player_marker_node = add_runtime_marker_node(
+        symbol_scene,
+        'A',
+        Float3{
+            .m_x = 0.5F * k_scene_tile_world_size,
+            .m_y = 0.5F * k_scene_tile_world_size,
+            .m_z = 0.0F,
+        });
+    check(player_marker_node != k_invalid_scene_node_id, "runtime should be able to add a player marker scene node");
+    check(
+        update_scene_node_world_position(
+            symbol_scene,
+            player_marker_node,
+            Float3{
+                .m_x = 1.5F * k_scene_tile_world_size,
+                .m_y = 0.5F * k_scene_tile_world_size,
+                .m_z = 0.0F,
+            }),
+        "runtime should be able to move a player marker scene node");
+
+    const SceneNode* moved_player_marker = find_scene_node(symbol_scene, player_marker_node);
+    check(moved_player_marker != nullptr, "moved player marker scene node should remain addressable");
+    check(
+        moved_player_marker != nullptr
+            && moved_player_marker->m_world_position.m_x == 1.5F * k_scene_tile_world_size,
+        "player marker scene node should report updated world position after movement");
+
     const WorldMesh symbol_mesh = build_world_mesh(symbol_scene, symbol_map, 0.0F, 0.0F, 0.0F, 0.0F);
 
-    constexpr std::size_t marker_vertices = 77U;
-    constexpr std::size_t marker_indices = 360U;
-    const std::size_t expected_symbol_vertices = expected_vertices + (3U * marker_vertices);
-    const std::size_t expected_symbol_indices = expected_indices + (3U * marker_indices);
+    const std::size_t expected_symbol_vertices = expected_vertices;
+    const std::size_t expected_symbol_indices = expected_indices;
     check(
         symbol_mesh.m_vertices.size() == expected_symbol_vertices,
-        "world mesh should include marker sphere vertices for A/K/S symbols");
+        "world mesh should exclude scene-driven marker vertices for A/K/S symbols");
     check(
         symbol_mesh.m_indices.size() == expected_symbol_indices,
-        "world mesh should include marker sphere indices for A/K/S symbols");
+        "world mesh should exclude scene-driven marker indices for A/K/S symbols");
 
     bool found_blue_marker = false;
     bool found_yellow_marker = false;
@@ -1134,9 +1195,9 @@ void test_world_mesh_generation_rules()
         }
     }
 
-    check(found_blue_marker, "world mesh should render a blue marker for player symbol A");
-    check(found_yellow_marker, "world mesh should render a yellow marker for key symbol K");
-    check(found_white_marker, "world mesh should render a white marker for switch symbol S");
+    check(!found_blue_marker, "world mesh should not bake a blue player marker into static geometry");
+    check(!found_yellow_marker, "world mesh should not bake a yellow key marker into static geometry");
+    check(!found_white_marker, "world mesh should not bake a white switch marker into static geometry");
     check(found_door_brown, "world mesh should render brown geometry for door symbol D");
 
     const WorldMesh symbol_mesh_again = build_world_mesh(symbol_scene, symbol_map, 0.0F, 0.0F, 0.0F, 0.0F);
@@ -1146,6 +1207,176 @@ void test_world_mesh_generation_rules()
     check(
         symbol_mesh_again.m_indices == symbol_mesh.m_indices,
         "symbol mesh build should be deterministic for index ordering");
+}
+
+void test_wall_collision_octree_overlap_rules()
+{
+    const DungeonMap map = build_test_map();
+
+    WallCollisionOctree octree{};
+    check(build_wall_collision_octree(map, octree), "wall collision octree should build for a map with walls");
+
+    Scene scene{};
+    check(build_scene_from_dungeon_map(map, scene), "scene build should succeed for wall collision tests");
+
+    const SceneNodeId marker_node = add_runtime_marker_node(
+        scene,
+        'A',
+        Float3{
+            .m_x = 0.5F * k_scene_tile_world_size,
+            .m_y = 1.5F * k_scene_tile_world_size,
+            .m_z = 0.0F,
+        });
+    check(marker_node != k_invalid_scene_node_id, "wall collision tests should create a runtime marker node");
+
+    const SceneNode* marker = find_scene_node(scene, marker_node);
+    check(marker != nullptr, "runtime marker node should be addressable for wall collision tests");
+    if (marker == nullptr)
+    {
+        return;
+    }
+
+    const Float3 blocked_world{
+        .m_x = 1.5F * k_scene_tile_world_size,
+        .m_y = 0.5F * k_scene_tile_world_size,
+        .m_z = 0.0F,
+    };
+    const Bounds3 blocked_bounds{
+        .m_min = Float3{
+            .m_x = blocked_world.m_x + marker->m_local_bounds.m_min.m_x,
+            .m_y = blocked_world.m_y + marker->m_local_bounds.m_min.m_y,
+            .m_z = blocked_world.m_z + marker->m_local_bounds.m_min.m_z,
+        },
+        .m_max = Float3{
+            .m_x = blocked_world.m_x + marker->m_local_bounds.m_max.m_x,
+            .m_y = blocked_world.m_y + marker->m_local_bounds.m_max.m_y,
+            .m_z = blocked_world.m_z + marker->m_local_bounds.m_max.m_z,
+        },
+    };
+    check(
+        wall_collision_octree_overlaps_bounds(octree, blocked_bounds),
+        "wall collision octree should report overlap for a runtime scene node moved into a wall tile");
+
+    const Float3 clear_world{
+        .m_x = 2.5F * k_scene_tile_world_size,
+        .m_y = 1.5F * k_scene_tile_world_size,
+        .m_z = 0.0F,
+    };
+    const Bounds3 clear_bounds{
+        .m_min = Float3{
+            .m_x = clear_world.m_x + marker->m_local_bounds.m_min.m_x,
+            .m_y = clear_world.m_y + marker->m_local_bounds.m_min.m_y,
+            .m_z = clear_world.m_z + marker->m_local_bounds.m_min.m_z,
+        },
+        .m_max = Float3{
+            .m_x = clear_world.m_x + marker->m_local_bounds.m_max.m_x,
+            .m_y = clear_world.m_y + marker->m_local_bounds.m_max.m_y,
+            .m_z = clear_world.m_z + marker->m_local_bounds.m_max.m_z,
+        },
+    };
+    check(
+        !wall_collision_octree_overlaps_bounds(octree, clear_bounds),
+        "wall collision octree should not report overlap for a runtime scene node inside clear floor space");
+}
+
+void test_scene_blocking_node_rules()
+{
+    const DungeonMap map = build_test_map();
+    Scene scene{};
+    check(build_scene_from_dungeon_map(map, scene), "scene build should succeed for scene blocking tests");
+
+    const uint32_t non_blocking_visual_flags = scene_node_category_bits(SceneNodeCategory::DynamicAttachment)
+        | scene_node_category_bits(SceneNodeCategory::Renderable)
+        | scene_node_category_bits(SceneNodeCategory::Pickable);
+    const uint32_t blocking_visual_flags = non_blocking_visual_flags
+        | scene_node_category_bits(SceneNodeCategory::BlocksMovement);
+
+    const SceneNodeId player_node = add_runtime_marker_node(
+        scene,
+        'A',
+        Float3{
+            .m_x = 0.5F * k_scene_tile_world_size,
+            .m_y = 1.5F * k_scene_tile_world_size,
+            .m_z = 0.0F,
+        });
+    check(player_node != k_invalid_scene_node_id, "scene blocking tests should create a player marker node");
+
+    const SceneNodeId key_node = add_runtime_visual_node(
+        scene,
+        'K',
+        Float3{
+            .m_x = 1.5F * k_scene_tile_world_size,
+            .m_y = 1.5F * k_scene_tile_world_size,
+            .m_z = 0.0F,
+        },
+        non_blocking_visual_flags,
+        -1);
+    const SceneNodeId switch_node = add_runtime_visual_node(
+        scene,
+        'S',
+        Float3{
+            .m_x = 2.5F * k_scene_tile_world_size,
+            .m_y = 1.5F * k_scene_tile_world_size,
+            .m_z = 0.0F,
+        },
+        non_blocking_visual_flags,
+        -1);
+    const SceneNodeId statue_node = add_runtime_visual_node(
+        scene,
+        'T',
+        Float3{
+            .m_x = 2.5F * k_scene_tile_world_size,
+            .m_y = 0.5F * k_scene_tile_world_size,
+            .m_z = 0.0F,
+        },
+        blocking_visual_flags,
+        -1);
+
+    check(key_node != k_invalid_scene_node_id, "scene blocking tests should create a non-blocking key node");
+    check(switch_node != k_invalid_scene_node_id, "scene blocking tests should create a non-blocking switch node");
+    check(statue_node != k_invalid_scene_node_id, "scene blocking tests should create a blocking statue node");
+
+    const SceneNode* key = find_scene_node(scene, key_node);
+    const SceneNode* statue = find_scene_node(scene, statue_node);
+    check(key != nullptr, "scene blocking tests should find key node");
+    check(statue != nullptr, "scene blocking tests should find statue node");
+    if (key == nullptr || statue == nullptr)
+    {
+        return;
+    }
+
+    const Bounds3 key_bounds{
+        .m_min = Float3{
+            .m_x = key->m_world_position.m_x + key->m_local_bounds.m_min.m_x,
+            .m_y = key->m_world_position.m_y + key->m_local_bounds.m_min.m_y,
+            .m_z = key->m_world_position.m_z + key->m_local_bounds.m_min.m_z,
+        },
+        .m_max = Float3{
+            .m_x = key->m_world_position.m_x + key->m_local_bounds.m_max.m_x,
+            .m_y = key->m_world_position.m_y + key->m_local_bounds.m_max.m_y,
+            .m_z = key->m_world_position.m_z + key->m_local_bounds.m_max.m_z,
+        },
+    };
+    const Bounds3 statue_bounds{
+        .m_min = Float3{
+            .m_x = statue->m_world_position.m_x + statue->m_local_bounds.m_min.m_x,
+            .m_y = statue->m_world_position.m_y + statue->m_local_bounds.m_min.m_y,
+            .m_z = statue->m_world_position.m_z + statue->m_local_bounds.m_min.m_z,
+        },
+        .m_max = Float3{
+            .m_x = statue->m_world_position.m_x + statue->m_local_bounds.m_max.m_x,
+            .m_y = statue->m_world_position.m_y + statue->m_local_bounds.m_max.m_y,
+            .m_z = statue->m_world_position.m_z + statue->m_local_bounds.m_max.m_z,
+        },
+    };
+
+    const uint32_t blocking_flag = scene_node_category_bits(SceneNodeCategory::BlocksMovement);
+    check(
+        !any_scene_node_blocks_bounds(scene, key_bounds, player_node, blocking_flag),
+        "non-blocking key and switch visuals should not block movement bounds checks");
+    check(
+        any_scene_node_blocks_bounds(scene, statue_bounds, player_node, blocking_flag),
+        "blocking statue-style visuals should block movement bounds checks");
 }
 
 void test_room_corridor_generation_rules()
@@ -1426,6 +1657,8 @@ int main()
         test_inventory_pipeline_rules();
         test_hud_surface_rules();
         test_world_mesh_generation_rules();
+        test_wall_collision_octree_overlap_rules();
+        test_scene_blocking_node_rules();
         test_room_corridor_generation_rules();
         test_generated_dungeon_validation_rules();
     }

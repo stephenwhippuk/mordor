@@ -81,6 +81,10 @@ Must be resolved before rotation is considered production-quality. Tracked for P
 | P5-05 | Add frustum culling and render submission metrics | P1-08, P5-01 | Medium | Complete | plan/rendering-engine-plan.md |
 | P5-06 | Rework occlusion to actor-centric corridor and add keyboard player-move probe controls | P5-04 | High | Complete | execution/next-steps.md |
 | P5-07 | Merge wall CSG surfaces to visible polygons only (top and boundary runs) | P5-01, P5-04 | High | Complete | architecture/engine-architecture.md |
+| P5-08 | Static mesh lifetime + wall-surface octree baseline for collision/occlusion queries | P5-07 | High | Complete | architecture/engine-architecture.md |
+| P5-09 | Move player/key/switch markers to separate scene nodes and keep static mesh marker-free | P5-08 | High | Complete | decisions/0007-static-mesh-and-dynamic-scene-nodes.md |
+| P5-10 | Route player movement collision through wall octree and generalize runtime visual nodes for future item/NPC rendering | P5-09 | High | Complete | decisions/0007-static-mesh-and-dynamic-scene-nodes.md |
+| P5-11 | Formalize dual-layer map semantics: visual-occlusion vs physical-blocking, with explicit node blocking flags | P5-10 | High | Complete | decisions/0008-visual-occlusion-vs-physical-blocking-layers.md |
 
 ### Known Limitations — Post P5
 

@@ -35,6 +35,8 @@ This documentation is split by concern so planning can grow without turning into
 6. [0004: Windowing and OpenGL Context Library](decisions/0004-windowing-and-context-library.md)
 7. [0005: World Scene and Spatial Query Structure](decisions/0005-scene-spatial-structure.md)
 8. [0006: Camera, Occlusion, and Mouse Picking Policy](decisions/0006-camera-occlusion-mouse-picking.md)
+9. [0007: Static Mesh and Dynamic Scene Node Ownership](decisions/0007-static-mesh-and-dynamic-scene-nodes.md)
+10. [0008: Visual-Occlusion and Physical-Blocking Layer Separation](decisions/0008-visual-occlusion-vs-physical-blocking-layers.md)
 
 ### Documentation
 1. [Documentation Contribution Guide](contributing-docs.md)

@@ -29,8 +29,26 @@ struct WorldMesh
 {
     std::vector<WorldVertex> m_vertices{};
     std::vector<uint32_t> m_indices{}; // Combined index stream for diagnostics/tests.
-    std::vector<uint32_t> m_opaque_indices{};
-    std::vector<uint32_t> m_transparent_indices{};
+    std::vector<uint32_t> m_opaque_indices{}; // Floors, markers, and any always-opaque geometry.
+    std::vector<uint32_t> m_transparent_indices{}; // Wall surfaces rendered in occlusion-aware passes.
+};
+
+struct WallSurfaceBounds
+{
+    Bounds3 m_bounds{};
+};
+
+struct WallCollisionOctreeNode
+{
+    Bounds3 m_bounds{};
+    std::vector<int> m_surface_indices{};
+    std::vector<int> m_children{}; // Child node indices in octree array.
+};
+
+struct WallCollisionOctree
+{
+    std::vector<WallSurfaceBounds> m_surfaces{};
+    std::vector<WallCollisionOctreeNode> m_nodes{};
 };
 
 /// Build floor and wall geometry from scene node world bounds and map tile data.
@@ -47,5 +65,8 @@ WorldMesh build_world_mesh(
     float camera_z,
     float anchor_x,
     float anchor_z);
+
+bool build_wall_collision_octree(const DungeonMap& map, WallCollisionOctree& out_octree);
+bool wall_collision_octree_overlaps_bounds(const WallCollisionOctree& octree, const Bounds3& bounds);
 
 } // namespace mordor

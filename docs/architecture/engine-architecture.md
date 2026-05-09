@@ -62,12 +62,18 @@ Current baseline:
 6. Mouse-driven tile/entity picking: queries scene spatial index at cursor location; returns priority-ordered candidates based on distance; debug diagnostics log point hits, best hit, and neighborhood results every 120 ticks.
 7. Camera movement and controls consume input actions from the platform input binding layer rather than hard-coded key checks.
 8. Runtime boots from deterministic room/corridor generated dungeon data by default (fixed seed in current bootstrap), with fallback to handcrafted ASCII map if generation/validation fails.
-9. Generated gameplay symbols are visualized in world mesh output: doors render as brown blocking geometry, player marker as blue sphere, keys as yellow spheres, switches as white spheres.
+9. Doors remain part of the static world mesh as brown blocking geometry, while player/key/switch markers are rendered from separate scene nodes so they are no longer baked into static mesh output.
 10. Perception debug overlays render LOS rays, hearing event traces, and fog visible/explored cells from simulation-owned query outputs.
 11. Screen-space HUD is composited as deterministic overlay surfaces over the world pass.
 12. Per-vertex alpha channel support: world geometry vertices now include opacity (alpha) for occlusion handling; OpenGL blending (GL_SRC_ALPHA / GL_ONE_MINUS_SRC_ALPHA) is enabled during world drawing to fade foreground walls and improve interaction readability.
 13. Occlusion fade now uses actor-centric gating: only wall geometry between camera and active actor anchor, within a corridor and radius gate, is faded.
 14. Wall CSG-style mesh emission now merges contiguous coplanar wall regions into visible surfaces (top planes and boundary side runs) instead of per-block wall cubes, reducing polygon count and establishing a better foundation for static mesh and collision acceleration structures.
+15. Runtime now uploads the static world mesh once at map load and updates occlusion via camera-to-target ray uniforms in shader wall passes rather than rebuilding geometry each tick.
+16. Player, key, and switch markers are represented as separate renderable scene nodes; the same runtime visual-node path now also supports future item and NPC markers without baking them into static geometry.
+17. Runtime collision semantics now follow a two-layer model: visual-occlusion participation is separate from physical movement-blocking participation.
+18. Player movement now performs dynamic scene-node versus static-mesh collision checks through the wall-surface octree before committing scene-node transform updates.
+19. Dynamic visual nodes are non-blocking by default and only block movement when explicitly flagged as movement blockers.
+20. A wall-surface collision octree is built at runtime bootstrap from merged wall regions to establish spatial acceleration for collision and future occlusion/item-visibility queries.
 
 Ordering note:
 1. Ship stable world rendering before advanced visual effects.
@@ -93,15 +99,17 @@ Current baseline:
 1. Simulation-owned occupancy grid derives static blocking from the handcrafted map.
 2. Dynamic blocking is applied from interactable state.
 3. Actor occupancy is tracked separately from blocking and can be queried per tile.
-4. Baseline line-of-sight and occlusion queries are implemented over simulation-owned occupancy state, including blocked-target and blocked-corner handling.
-5. Deterministic visibility unit tests now cover clear, blocked, blocked-target, and blocked-corner LOS cases.
-6. Directional hearing primitives evaluate audibility from source/listener tiles with deterministic distance falloff, facing bias, and occupancy-based occlusion attenuation.
-7. Fog-of-war state now tracks visible versus explored cells and refreshes visibility from observer tiles using LOS-gated simulation queries.
-8. Perception debug-tile builders produce deterministic overlay payloads that map LOS, hearing, and fog results into renderer-consumable debug geometry.
-9. Deterministic room/corridor generation baseline is implemented in the map layer: non-overlapping rectangular rooms are carved into wall-filled maps and connected with L-shaped corridors using seed-driven random generation.
-10. Generator constraints baseline now places deterministic key/switch/door triplets: locked doors are embedded on generated traversal routes with paired key and switch placements emitted as map metadata for follow-on gameplay binding.
-11. Prefab insertion baseline is implemented as deterministic set-piece stamping over carved rooms, with placement metadata emitted for authored scene binding and follow-on runtime integration.
-12. Generation validation baseline verifies reachability/solvability with actionable diagnostics: walkable connectivity is checked with and without door unlock assumptions, and generated key/switch/door constraints are structurally validated before maps are considered valid.
+4. Runtime movement now uses scene-node bounds against the wall octree as the static-mesh collision check, with occupancy remaining the coarse gameplay walkability layer.
+5. Visibility and collision are treated as separate layers: an entity can be visible/interactable without being movement-blocking.
+6. Baseline line-of-sight and occlusion queries are implemented over simulation-owned occupancy state, including blocked-target and blocked-corner handling.
+7. Deterministic visibility unit tests now cover clear, blocked, blocked-target, and blocked-corner LOS cases.
+8. Directional hearing primitives evaluate audibility from source/listener tiles with deterministic distance falloff, facing bias, and occupancy-based occlusion attenuation.
+9. Fog-of-war state now tracks visible versus explored cells and refreshes visibility from observer tiles using LOS-gated simulation queries.
+10. Perception debug-tile builders produce deterministic overlay payloads that map LOS, hearing, and fog results into renderer-consumable debug geometry.
+11. Deterministic room/corridor generation baseline is implemented in the map layer: non-overlapping rectangular rooms are carved into wall-filled maps and connected with L-shaped corridors using seed-driven random generation.
+12. Generator constraints baseline now places deterministic key/switch/door triplets: locked doors are embedded on generated traversal routes with paired key and switch placements emitted as map metadata for follow-on gameplay binding.
+13. Prefab insertion baseline is implemented as deterministic set-piece stamping over carved rooms, with placement metadata emitted for authored scene binding and follow-on runtime integration.
+14. Generation validation baseline verifies reachability/solvability with actionable diagnostics: walkable connectivity is checked with and without door unlock assumptions, and generated key/switch/door constraints are structurally validated before maps are considered valid.
 
 Ordering note:
 1. Deterministic behavior is a hard requirement for reliable testing.

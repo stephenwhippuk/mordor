@@ -31,10 +31,6 @@ struct DemoWorld
 {
     uint64_t m_tick_count{0};
     double m_player_move_cooldown_seconds{0.0};
-    bool m_has_occlusion_snapshot{false};
-    float m_last_occlusion_camera_x{0.0F};
-    float m_last_occlusion_camera_y{0.0F};
-    mordor::TileCoord m_last_occlusion_player_tile{};
 };
 
 namespace {
@@ -279,7 +275,6 @@ bool mark_player_spawn_tile(mordor::DungeonMap& map, int& out_col, int& out_row)
     {
         if (!tile.m_blocks_movement && tile.m_symbol == '.')
         {
-            tile.m_symbol = 'A';
             out_col = tile.m_col;
             out_row = tile.m_row;
             return true;
@@ -290,7 +285,6 @@ bool mark_player_spawn_tile(mordor::DungeonMap& map, int& out_col, int& out_row)
     {
         if (!tile.m_blocks_movement)
         {
-            tile.m_symbol = 'A';
             out_col = tile.m_col;
             out_row = tile.m_row;
             return true;
@@ -298,18 +292,6 @@ bool mark_player_spawn_tile(mordor::DungeonMap& map, int& out_col, int& out_row)
     }
 
     return false;
-}
-
-mordor::DungeonTile* find_tile(mordor::DungeonMap& map, int col, int row)
-{
-    for (mordor::DungeonTile& tile : map.m_tiles)
-    {
-        if (tile.m_col == col && tile.m_row == row)
-        {
-            return &tile;
-        }
-    }
-    return nullptr;
 }
 
 mordor::Float3 tile_center_world(mordor::TileCoord tile)
@@ -335,8 +317,10 @@ mordor::Float3 camera_eye_world(const mordor::CameraState& camera)
 }
 
 bool try_move_player_marker(
-    mordor::DungeonMap& map,
+    mordor::Scene& scene,
+    mordor::SceneNodeId player_marker_node_id,
     const mordor::OccupancyGrid& occupancy,
+    const mordor::WallCollisionOctree& wall_collision_octree,
     mordor::TileCoord& in_out_player_tile,
     int delta_col,
     int delta_row)
@@ -363,19 +347,46 @@ bool try_move_player_marker(
         return false;
     }
 
-    mordor::DungeonTile* previous = find_tile(map, in_out_player_tile.m_col, in_out_player_tile.m_row);
-    if (previous != nullptr && previous->m_symbol == 'A')
-    {
-        previous->m_symbol = '.';
-    }
-
-    mordor::DungeonTile* next = find_tile(map, destination.m_col, destination.m_row);
-    if (next == nullptr)
+    const mordor::SceneNode* player_node = mordor::find_scene_node(scene, player_marker_node_id);
+    if (player_node == nullptr)
     {
         return false;
     }
 
-    next->m_symbol = 'A';
+    const mordor::Float3 destination_world = tile_center_world(destination);
+    const mordor::Bounds3 candidate_bounds{
+        .m_min = mordor::Float3{
+            .m_x = destination_world.m_x + player_node->m_local_bounds.m_min.m_x,
+            .m_y = destination_world.m_y + player_node->m_local_bounds.m_min.m_y,
+            .m_z = destination_world.m_z + player_node->m_local_bounds.m_min.m_z,
+        },
+        .m_max = mordor::Float3{
+            .m_x = destination_world.m_x + player_node->m_local_bounds.m_max.m_x,
+            .m_y = destination_world.m_y + player_node->m_local_bounds.m_max.m_y,
+            .m_z = destination_world.m_z + player_node->m_local_bounds.m_max.m_z,
+        },
+    };
+    if (mordor::wall_collision_octree_overlaps_bounds(wall_collision_octree, candidate_bounds))
+    {
+        return false;
+    }
+
+    const uint32_t scene_blocking_flags =
+        mordor::scene_node_category_bits(mordor::SceneNodeCategory::BlocksMovement);
+    if (mordor::any_scene_node_blocks_bounds(
+            scene,
+            candidate_bounds,
+            player_marker_node_id,
+            scene_blocking_flags))
+    {
+        return false;
+    }
+
+    if (!mordor::update_scene_node_world_position(scene, player_marker_node_id, destination_world))
+    {
+        return false;
+    }
+
     in_out_player_tile = destination;
     return true;
 }
@@ -461,7 +472,7 @@ int main(int argc, char** argv)
     int player_row = -1;
     if (mark_player_spawn_tile(handcrafted_map, player_col, player_row))
     {
-        MORDOR_LOG_INFO("Placed player marker tile at ({}, {})", player_col, player_row);
+        MORDOR_LOG_INFO("Selected player spawn tile at ({}, {})", player_col, player_row);
     }
     else
     {
@@ -488,9 +499,19 @@ int main(int argc, char** argv)
         world_scene.m_spatial_index.m_indexed_node_count,
         world_scene.m_spatial_index.m_cells.size());
 
+    const mordor::Float3 initial_player_world = tile_center_world(active_player_tile);
+    const mordor::SceneNodeId player_marker_node_id =
+        mordor::add_runtime_marker_node(world_scene, 'A', initial_player_world);
+    if (player_marker_node_id == mordor::k_invalid_scene_node_id)
+    {
+        MORDOR_LOG_CRITICAL("Failed to create player marker scene node");
+        renderer.shutdown();
+        mordor::log::shutdown();
+        return 1;
+    }
+
     const mordor::CameraState initial_camera = renderer.camera_state();
     const mordor::Float3 initial_camera_eye = camera_eye_world(initial_camera);
-    const mordor::Float3 initial_player_world = tile_center_world(active_player_tile);
     const mordor::WorldMesh world_mesh = mordor::build_world_mesh(
         world_scene,
         handcrafted_map,
@@ -510,10 +531,7 @@ int main(int argc, char** argv)
         world_mesh.m_vertices.size(),
         world_mesh.m_indices.size());
     renderer.load_world_mesh(world_mesh);
-    world.m_has_occlusion_snapshot = true;
-    world.m_last_occlusion_camera_x = initial_camera_eye.m_x;
-    world.m_last_occlusion_camera_y = initial_camera_eye.m_y;
-    world.m_last_occlusion_player_tile = active_player_tile;
+    renderer.set_occlusion_target_world(initial_player_world.m_x, initial_player_world.m_y);
 
 
     mordor::OccupancyGrid occupancy_grid{};
@@ -523,6 +541,19 @@ int main(int argc, char** argv)
         renderer.shutdown();
         mordor::log::shutdown();
         return 1;
+    }
+
+    mordor::WallCollisionOctree wall_collision_octree{};
+    if (mordor::build_wall_collision_octree(handcrafted_map, wall_collision_octree))
+    {
+        MORDOR_LOG_INFO(
+            "Built wall collision octree surfaces={} nodes={}",
+            wall_collision_octree.m_surfaces.size(),
+            wall_collision_octree.m_nodes.size());
+    }
+    else
+    {
+        MORDOR_LOG_WARN("Wall collision octree build returned empty structure");
     }
 
     mordor::FogOfWarState fog_of_war{};
@@ -594,8 +625,9 @@ int main(int argc, char** argv)
         [&world,
          &renderer,
          &world_scene,
-         &handcrafted_map,
          &occupancy_grid,
+         &wall_collision_octree,
+         player_marker_node_id,
          &active_player_tile,
          &fog_of_war,
          &base_debug_map,
@@ -638,18 +670,18 @@ int main(int argc, char** argv)
             player_move_row = 0;
         }
 
-        bool player_tile_changed = false;
         if (world.m_player_move_cooldown_seconds <= 0.0)
         {
             if (try_move_player_marker(
-                    handcrafted_map,
+                    world_scene,
+                    player_marker_node_id,
                     occupancy_grid,
+                    wall_collision_octree,
                     active_player_tile,
                     player_move_col,
                     player_move_row))
             {
                 world.m_player_move_cooldown_seconds = 0.12;
-                player_tile_changed = true;
                 MORDOR_LOG_DEBUG(
                     "player_move tick={} tile=({}, {})",
                     world.m_tick_count,
@@ -658,39 +690,8 @@ int main(int argc, char** argv)
             }
         }
 
-        const mordor::CameraState camera_for_occlusion = renderer.camera_state();
-        const mordor::Float3 camera_eye_for_occlusion = camera_eye_world(camera_for_occlusion);
-        constexpr float camera_delta_epsilon = 1.0F;
-        const bool camera_changed =
-            !world.m_has_occlusion_snapshot
-            || std::fabs(camera_eye_for_occlusion.m_x - world.m_last_occlusion_camera_x) > camera_delta_epsilon
-            || std::fabs(camera_eye_for_occlusion.m_y - world.m_last_occlusion_camera_y) > camera_delta_epsilon;
-
-        const bool player_changed =
-            !world.m_has_occlusion_snapshot
-            || player_tile_changed
-            || active_player_tile.m_col != world.m_last_occlusion_player_tile.m_col
-            || active_player_tile.m_row != world.m_last_occlusion_player_tile.m_row;
-
-        if (camera_changed || player_changed)
-        {
-            const mordor::Float3 player_anchor_world = tile_center_world(active_player_tile);
-            const mordor::WorldMesh occlusion_mesh = mordor::build_world_mesh(
-                world_scene,
-                handcrafted_map,
-                camera_eye_for_occlusion.m_x,
-                camera_eye_for_occlusion.m_y,
-                player_anchor_world.m_x,
-                player_anchor_world.m_y);
-            if (!occlusion_mesh.m_vertices.empty() && !occlusion_mesh.m_indices.empty())
-            {
-                renderer.load_world_mesh(occlusion_mesh);
-                world.m_has_occlusion_snapshot = true;
-                world.m_last_occlusion_camera_x = camera_eye_for_occlusion.m_x;
-                world.m_last_occlusion_camera_y = camera_eye_for_occlusion.m_y;
-                world.m_last_occlusion_player_tile = active_player_tile;
-            }
-        }
+        const mordor::Float3 player_anchor_world = tile_center_world(active_player_tile);
+        renderer.set_occlusion_target_world(player_anchor_world.m_x, player_anchor_world.m_y);
 
         if (world.m_tick_count % 60 == 0)
         {

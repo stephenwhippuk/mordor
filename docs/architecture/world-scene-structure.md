@@ -12,6 +12,17 @@ Define the minimum world and scene structure required before Phase 2 systems att
 
 ## Runtime Model
 
+### Layer Policy
+The runtime uses two distinct spatial/semantic layers:
+1. Visual-Occlusion Layer: controls rendering participation and optional occlusion contribution.
+2. Physical-Blocking Layer: controls movement/collision blocking.
+
+Rules:
+1. A node may be visible but non-blocking (for example keys or floor switches).
+2. A node may be both visible and blocking (for example statues or large props).
+3. Static world walls are blocking by default unless authored as explicit visual-only exceptions (for example illusory walls).
+4. Interaction eligibility is independent from blocking; non-blocking objects can still be interactable anchors.
+
 ### 1) Authored World Definition
 The handcrafted map remains the source asset for layout and authored metadata.
 
@@ -42,6 +53,9 @@ Rules:
 1. Static map nodes are created once at map load and only change on explicit world edits.
 2. Dynamic nodes update through deterministic simulation state, not render-thread side effects.
 3. Parenting is structural, not gameplay-authoritative. Simulation blocking remains outside the scene graph.
+4. Visual markers for runtime entities and interactables should be emitted as separate scene nodes rather than baked into the static world mesh.
+5. Static-mesh collision checks should treat dynamic scene-node bounds as the query primitive and the wall octree as the acceleration structure for merged world geometry.
+6. Movement blocking is opt-in for dynamic visuals and must not be inferred from render symbol alone.
 
 ### 3) Spatial Index
 Use a loose octree over world-space node bounds for broadphase queries.
@@ -93,6 +107,8 @@ This split avoids forcing gameplay rules to depend on renderer-oriented hierarch
 2. Static-world rebuild happens on map load only.
 3. Dynamic actor and interactable attachments publish transform changes through simulation-owned systems.
 4. Picking and culling read from the latest committed scene state for the frame.
+5. Static mesh collision uses an acceleration structure derived from merged wall surfaces, while dynamic scene nodes update their own bounds independently.
+6. Runtime visual nodes should be generic enough to cover follow-on items, NPCs, and temporary gameplay markers without requiring new static-mesh geometry paths.
 
 ## Phase 2 Contracts
 Phase 2 systems should build against these contracts:

@@ -30,8 +30,9 @@ Integrate generated dungeon outputs into runtime systems and begin Phase 7 AI/co
 6. Expected normal case: only one to two wall segments fade at once; higher counts are acceptable primarily at low camera pitch where southern foreground stacks can overlap the actor.
 
 ## Follow-Up Actions
-1. Build a static world mesh lifetime path: render mesh upload once at map load, then update only occlusion state rather than rebuilding geometry each movement/camera change.
-2. Add octree acceleration over wall surfaces for collision and visibility helpers, aligned to merged CSG wall surfaces.
-3. Add debug telemetry that logs camera position, active party tile/world position, and count of occlusion-faded wall surfaces each sample interval.
-4. Add acceptance checks: rotate camera around stationary actor and verify that only foreground blockers fade while background walls remain opaque.
-5. Add click-to-move probe placement so testing can reposition the active player anchor from mouse picks.
+1. Add authored data fields for visual-only versus physically blocking map/scene content so illusory walls and floor-interactables are first-class content choices.
+2. Integrate wall-octree collision and scene spatial queries into broader visibility helper paths beyond the current player movement path.
+3. Generalize camera-to-target occlusion ray helper for non-wall visibility checks (keys, switches, items, NPCs) using the same query model now that runtime visuals are separate scene nodes.
+4. Add debug telemetry that logs camera position, active party tile/world position, and count of occlusion-faded wall surfaces each sample interval.
+5. Add acceptance checks: rotate camera around stationary actor and verify that only foreground blockers fade while background walls remain opaque.
+6. Add click-to-move probe placement so testing can reposition the active player anchor from mouse picks.

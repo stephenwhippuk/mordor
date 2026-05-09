@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <vector>
 
 namespace mordor {
 
@@ -37,6 +38,141 @@ bool key_down(GLFWwindow* window, int key)
     return glfwGetKey(window, key) == GLFW_PRESS;
 }
 #endif
+
+bool marker_symbol_supported(char symbol)
+{
+    return symbol != '\0';
+}
+
+void marker_colour(char symbol, float& out_r, float& out_g, float& out_b)
+{
+    if (symbol == 'A')
+    {
+        out_r = 0.20F;
+        out_g = 0.45F;
+        out_b = 0.95F;
+        return;
+    }
+
+    if (symbol == 'K')
+    {
+        out_r = 0.95F;
+        out_g = 0.85F;
+        out_b = 0.20F;
+        return;
+    }
+
+    if (symbol == 'I')
+    {
+        out_r = 0.20F;
+        out_g = 0.80F;
+        out_b = 0.35F;
+        return;
+    }
+
+    if (symbol == 'N')
+    {
+        out_r = 0.88F;
+        out_g = 0.30F;
+        out_b = 0.26F;
+        return;
+    }
+
+    if (symbol == 'S')
+    {
+        out_r = 0.92F;
+        out_g = 0.92F;
+        out_b = 0.92F;
+        return;
+    }
+
+    out_r = 0.25F;
+    out_g = 0.78F;
+    out_b = 0.86F;
+}
+
+void append_marker_sphere(
+    std::vector<WorldVertex>& vertices,
+    std::vector<uint32_t>& indices,
+    float center_x,
+    float center_z,
+    char symbol)
+{
+    float r = 1.0F;
+    float g = 1.0F;
+    float b = 1.0F;
+    marker_colour(symbol, r, g, b);
+
+    constexpr int stacks = 6;
+    constexpr int slices = 10;
+    constexpr float radius = 10.0F;
+    const float center_y = radius + 2.0F;
+
+    const auto base = static_cast<uint32_t>(vertices.size());
+    for (int stack = 0; stack <= stacks; ++stack)
+    {
+        const float v = static_cast<float>(stack) / static_cast<float>(stacks);
+        const float phi = v * 3.1415926535F;
+        const float sin_phi = std::sin(phi);
+        const float cos_phi = std::cos(phi);
+
+        for (int slice = 0; slice <= slices; ++slice)
+        {
+            const float u = static_cast<float>(slice) / static_cast<float>(slices);
+            const float theta = u * 6.283185307F;
+            const float sin_theta = std::sin(theta);
+            const float cos_theta = std::cos(theta);
+
+            vertices.push_back(WorldVertex{
+                center_x + radius * sin_phi * cos_theta,
+                center_y + radius * cos_phi,
+                center_z + radius * sin_phi * sin_theta,
+                r,
+                g,
+                b,
+                1.0F,
+            });
+        }
+    }
+
+    for (int stack = 0; stack < stacks; ++stack)
+    {
+        for (int slice = 0; slice < slices; ++slice)
+        {
+            const uint32_t row0 = static_cast<uint32_t>(stack * (slices + 1));
+            const uint32_t row1 = static_cast<uint32_t>((stack + 1) * (slices + 1));
+            const uint32_t i0 = base + row0 + static_cast<uint32_t>(slice);
+            const uint32_t i1 = base + row0 + static_cast<uint32_t>(slice + 1);
+            const uint32_t i2 = base + row1 + static_cast<uint32_t>(slice);
+            const uint32_t i3 = base + row1 + static_cast<uint32_t>(slice + 1);
+
+            indices.push_back(i0);
+            indices.push_back(i1);
+            indices.push_back(i2);
+            indices.push_back(i1);
+            indices.push_back(i3);
+            indices.push_back(i2);
+        }
+    }
+}
+
+void build_runtime_marker_mesh(
+    const Scene& scene,
+    const std::vector<SceneNodeId>& visible_nodes,
+    std::vector<WorldVertex>& out_vertices,
+    std::vector<uint32_t>& out_indices)
+{
+    for (SceneNodeId node_id : visible_nodes)
+    {
+        const SceneNode* node = find_scene_node(scene, node_id);
+        if (node == nullptr || !marker_symbol_supported(node->m_debug_symbol))
+        {
+            continue;
+        }
+
+        append_marker_sphere(out_vertices, out_indices, node->m_world_position.m_x, node->m_world_position.m_y, node->m_debug_symbol);
+    }
+}
 
 } // namespace
 
@@ -179,10 +315,12 @@ layout(location = 2) in float a_alpha;
 uniform mat4 u_mvp;
 out vec3 v_col;
 out float v_alpha;
+out vec3 v_world;
 void main() {
     gl_Position = u_mvp * vec4(a_pos, 1.0);
     v_col = a_col;
     v_alpha = a_alpha;
+    v_world = a_pos;
 }
 )glsl";
 
@@ -190,9 +328,72 @@ static constexpr const char* k_world_frag_src = R"glsl(
 #version 410 core
 in vec3 v_col;
 in float v_alpha;
+in vec3 v_world;
+uniform int u_occlusion_pass;
+uniform vec2 u_camera_world;
+uniform vec2 u_target_world;
 out vec4 frag;
+
+float compute_occlusion_alpha(vec2 world_xz)
+{
+    vec2 seg = u_target_world - u_camera_world;
+    float seg_len_sq = dot(seg, seg);
+    if (seg_len_sq <= 1e-4)
+    {
+        return 1.0;
+    }
+
+    vec2 to_frag = world_xz - u_camera_world;
+    float projected = dot(to_frag, seg) / seg_len_sq;
+    if (projected <= 0.0 || projected >= 1.0)
+    {
+        return 1.0;
+    }
+
+    vec2 closest = u_camera_world + (projected * seg);
+    float lateral = length(world_xz - closest);
+    float corridor_half_width = 36.0; // 0.75 tile
+    if (lateral >= corridor_half_width)
+    {
+        return 1.0;
+    }
+
+    float dist_to_target = length(world_xz - u_target_world);
+    float radius = 192.0; // 4 tiles
+    if (dist_to_target > radius)
+    {
+        return 1.0;
+    }
+
+    float corridor_factor = 1.0 - clamp(lateral / corridor_half_width, 0.0, 1.0);
+    float radius_factor = 1.0 - clamp(dist_to_target / radius, 0.0, 1.0);
+    float fade_strength = clamp(corridor_factor * radius_factor, 0.0, 1.0);
+    return 1.0 - (0.7 * fade_strength);
+}
+
 void main() {
-    frag = vec4(v_col, v_alpha);
+    if (u_occlusion_pass == 0)
+    {
+        frag = vec4(v_col, v_alpha);
+        return;
+    }
+
+    float dynamic_alpha = compute_occlusion_alpha(v_world.xz);
+    if (u_occlusion_pass == 1)
+    {
+        if (dynamic_alpha < 0.999)
+        {
+            discard;
+        }
+        frag = vec4(v_col, 1.0);
+        return;
+    }
+
+    if (dynamic_alpha >= 0.999)
+    {
+        discard;
+    }
+    frag = vec4(v_col, dynamic_alpha);
 }
 )glsl";
 
@@ -283,6 +484,9 @@ bool Renderer::init(const RendererConfig& config)
         return false;
     }
     m_mvp_uniform = glGetUniformLocation(static_cast<GLuint>(m_world_shader), "u_mvp");
+    m_occlusion_pass_uniform = glGetUniformLocation(static_cast<GLuint>(m_world_shader), "u_occlusion_pass");
+    m_camera_world_uniform = glGetUniformLocation(static_cast<GLuint>(m_world_shader), "u_camera_world");
+    m_target_world_uniform = glGetUniformLocation(static_cast<GLuint>(m_world_shader), "u_target_world");
     MORDOR_LOG_INFO("World geometry shaders compiled and linked");
     return true;
 #endif
@@ -440,6 +644,12 @@ bool Renderer::is_input_action_active(InputAction action) const
     (void)action;
     return false;
 #endif
+}
+
+void Renderer::set_occlusion_target_world(float world_x, float world_y)
+{
+    m_occlusion_target_x = world_x;
+    m_occlusion_target_y = world_y;
 }
 
 CameraState Renderer::camera_state() const
@@ -702,6 +912,7 @@ void Renderer::load_world_mesh(const WorldMesh& mesh)
 void Renderer::draw_world(const Scene& scene, const DungeonMap& map)
 {
 #if MORDOR_HAS_OPENGL
+    (void)map;
     if (m_window == nullptr || m_world_shader == 0U
         || m_world_vao == 0U
         || (m_world_opaque_index_count <= 0 && m_world_transparent_index_count <= 0))
@@ -763,11 +974,14 @@ void Renderer::draw_world(const Scene& scene, const DungeonMap& map)
     glDepthFunc(GL_LEQUAL);
     glUseProgram(static_cast<GLuint>(m_world_shader));
     glUniformMatrix4fv(m_mvp_uniform, 1, GL_FALSE, mvp.m);
+    glUniform2f(m_camera_world_uniform, eye_x, eye_z);
+    glUniform2f(m_target_world_uniform, m_occlusion_target_x, m_occlusion_target_y);
 
     glBindVertexArray(static_cast<GLuint>(m_world_vao));
 
     if (m_world_opaque_index_count > 0 && m_world_ibo_opaque != 0U)
     {
+        glUniform1i(m_occlusion_pass_uniform, 0);
         glDisable(GL_BLEND);
         glDepthMask(GL_TRUE);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLuint>(m_world_ibo_opaque));
@@ -780,10 +994,20 @@ void Renderer::draw_world(const Scene& scene, const DungeonMap& map)
 
     if (m_world_transparent_index_count > 0 && m_world_ibo_transparent != 0U)
     {
+        glUniform1i(m_occlusion_pass_uniform, 1);
+        glDisable(GL_BLEND);
+        glDepthMask(GL_TRUE);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLuint>(m_world_ibo_transparent));
+        glDrawElements(
+            GL_TRIANGLES,
+            static_cast<GLsizei>(m_world_transparent_index_count),
+            GL_UNSIGNED_INT,
+            nullptr);
+
+        glUniform1i(m_occlusion_pass_uniform, 2);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glDepthMask(GL_FALSE);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLuint>(m_world_ibo_transparent));
         glDrawElements(
             GL_TRIANGLES,
             static_cast<GLsizei>(m_world_transparent_index_count),
@@ -791,6 +1015,62 @@ void Renderer::draw_world(const Scene& scene, const DungeonMap& map)
             nullptr);
         glDepthMask(GL_TRUE);
         glDisable(GL_BLEND);
+    }
+
+    std::vector<WorldVertex> marker_vertices{};
+    std::vector<uint32_t> marker_indices{};
+    build_runtime_marker_mesh(scene, visible_nodes, marker_vertices, marker_indices);
+    if (!marker_vertices.empty() && !marker_indices.empty())
+    {
+        GLuint marker_vao = 0U;
+        GLuint marker_vbo = 0U;
+        GLuint marker_ibo = 0U;
+        glGenVertexArrays(1, &marker_vao);
+        glGenBuffers(1, &marker_vbo);
+        glGenBuffers(1, &marker_ibo);
+
+        glBindVertexArray(marker_vao);
+        glBindBuffer(GL_ARRAY_BUFFER, marker_vbo);
+        glBufferData(
+            GL_ARRAY_BUFFER,
+            static_cast<GLsizeiptr>(marker_vertices.size() * sizeof(WorldVertex)),
+            marker_vertices.data(),
+            GL_DYNAMIC_DRAW);
+
+        const GLsizei stride = static_cast<GLsizei>(sizeof(WorldVertex));
+        glVertexAttribPointer(
+            0U, 3, GL_FLOAT, GL_FALSE, stride,
+            reinterpret_cast<const void*>(offsetof(WorldVertex, m_x)));
+        glEnableVertexAttribArray(0U);
+        glVertexAttribPointer(
+            1U, 3, GL_FLOAT, GL_FALSE, stride,
+            reinterpret_cast<const void*>(offsetof(WorldVertex, m_r)));
+        glEnableVertexAttribArray(1U);
+        glVertexAttribPointer(
+            2U, 1, GL_FLOAT, GL_FALSE, stride,
+            reinterpret_cast<const void*>(offsetof(WorldVertex, m_alpha)));
+        glEnableVertexAttribArray(2U);
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, marker_ibo);
+        glBufferData(
+            GL_ELEMENT_ARRAY_BUFFER,
+            static_cast<GLsizeiptr>(marker_indices.size() * sizeof(uint32_t)),
+            marker_indices.data(),
+            GL_DYNAMIC_DRAW);
+
+        glUniform1i(m_occlusion_pass_uniform, 0);
+        glDisable(GL_BLEND);
+        glDepthMask(GL_TRUE);
+        glDrawElements(
+            GL_TRIANGLES,
+            static_cast<GLsizei>(marker_indices.size()),
+            GL_UNSIGNED_INT,
+            nullptr);
+
+        glBindVertexArray(0U);
+        glDeleteVertexArrays(1, &marker_vao);
+        glDeleteBuffers(1, &marker_vbo);
+        glDeleteBuffers(1, &marker_ibo);
     }
 
     glBindVertexArray(0U);
