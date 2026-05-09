@@ -1058,7 +1058,7 @@ void test_world_mesh_generation_rules()
     Scene scene{};
     check(build_scene_from_dungeon_map(map, scene), "scene build should succeed for world mesh tests");
 
-    const WorldMesh mesh = build_world_mesh(scene, map);
+    const WorldMesh mesh = build_world_mesh(scene, map, 0.0F, 0.0F);
 
     // build_test_map has 5 floor tiles and 1 wall tile.
     // floor emits 4 verts + 6 indices, wall emits 20 verts + 30 indices.
@@ -1071,7 +1071,7 @@ void test_world_mesh_generation_rules()
     check(mesh.m_indices.size() == expected_indices, "world mesh index count should match floor+wall emission");
 
     // Deterministic output: repeated builds should byte-match counts and index ordering.
-    const WorldMesh mesh_again = build_world_mesh(scene, map);
+    const WorldMesh mesh_again = build_world_mesh(scene, map, 0.0F, 0.0F);
     check(mesh_again.m_vertices.size() == mesh.m_vertices.size(), "world mesh build should be deterministic for vertices");
     check(mesh_again.m_indices.size() == mesh.m_indices.size(), "world mesh build should be deterministic for indices");
     check(mesh_again.m_indices == mesh.m_indices, "world mesh index ordering should be deterministic");

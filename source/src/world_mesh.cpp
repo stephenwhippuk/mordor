@@ -3,6 +3,7 @@
 #include "mordor/scene.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 
@@ -41,6 +42,38 @@ void emit_quad(
     mesh.m_indices.push_back(base + 3U);
 }
 
+float calculate_occlusion_alpha(float wall_x0, float wall_z0, float wall_x1, float wall_z1, float camera_x, float camera_z)
+{
+    // Wall center in XZ plane.
+    const float wall_cx = (wall_x0 + wall_x1) * 0.5F;
+    const float wall_cz = (wall_z0 + wall_z1) * 0.5F;
+
+    // Distance from wall center to camera.
+    const float dx = camera_x - wall_cx;
+    const float dz = camera_z - wall_cz;
+    const float distance = std::sqrt(dx * dx + dz * dz);
+
+    // Fade range: walls closer than 200 units start fading, reach minimum at 100 units.
+    // min_alpha = 0.3 (wall still partially visible), max_alpha = 1.0 (fully opaque).
+    constexpr float fade_start = 200.0F;  // Distance where fade begins
+    constexpr float fade_end   = 100.0F;  // Distance where fade reaches minimum
+    constexpr float min_alpha  = 0.3F;    // Minimum opacity (wall not invisible)
+    constexpr float max_alpha  = 1.0F;    // Maximum opacity (fully opaque)
+
+    if (distance >= fade_start)
+    {
+        return max_alpha;  // Far away: fully opaque
+    }
+    if (distance <= fade_end)
+    {
+        return min_alpha;  // Very close: barely visible
+    }
+
+    // Linear fade between min and max.
+    const float t = (distance - fade_end) / (fade_start - fade_end);
+    return min_alpha + (max_alpha - min_alpha) * t;
+}
+
 void emit_floor_tile(WorldMesh& mesh, float x0, float z0, float x1, float z1)
 {
     // Flat quad at Y = 0, CCW winding viewed from above (+Y).
@@ -55,7 +88,7 @@ void emit_floor_tile(WorldMesh& mesh, float x0, float z0, float x1, float z1)
         WorldVertex{x0, 0.0F, z1, r, g, b});
 }
 
-void emit_wall_tile(WorldMesh& mesh, float x0, float z0, float x1, float z1)
+void emit_wall_tile(WorldMesh& mesh, float x0, float z0, float x1, float z1, float alpha)
 {
     const float h = k_wall_height;
 
@@ -65,10 +98,10 @@ void emit_wall_tile(WorldMesh& mesh, float x0, float z0, float x1, float z1)
     constexpr float tb = 0.20F;
     emit_quad(
         mesh,
-        WorldVertex{x0, h, z0, tr, tg, tb},
-        WorldVertex{x1, h, z0, tr, tg, tb},
-        WorldVertex{x1, h, z1, tr, tg, tb},
-        WorldVertex{x0, h, z1, tr, tg, tb});
+        WorldVertex{x0, h, z0, tr, tg, tb, alpha},
+        WorldVertex{x1, h, z0, tr, tg, tb, alpha},
+        WorldVertex{x1, h, z1, tr, tg, tb, alpha},
+        WorldVertex{x0, h, z1, tr, tg, tb, alpha});
 
     // South face (Z+).
     constexpr float fr = 0.50F;
@@ -76,18 +109,18 @@ void emit_wall_tile(WorldMesh& mesh, float x0, float z0, float x1, float z1)
     constexpr float fb = 0.16F;
     emit_quad(
         mesh,
-        WorldVertex{x0, 0.0F, z1, fr, fg, fb},
-        WorldVertex{x1, 0.0F, z1, fr, fg, fb},
-        WorldVertex{x1, h,    z1, fr, fg, fb},
-        WorldVertex{x0, h,    z1, fr, fg, fb});
+        WorldVertex{x0, 0.0F, z1, fr, fg, fb, alpha},
+        WorldVertex{x1, 0.0F, z1, fr, fg, fb, alpha},
+        WorldVertex{x1, h,    z1, fr, fg, fb, alpha},
+        WorldVertex{x0, h,    z1, fr, fg, fb, alpha});
 
     // North face (Z-).
     emit_quad(
         mesh,
-        WorldVertex{x1, 0.0F, z0, fr, fg, fb},
-        WorldVertex{x0, 0.0F, z0, fr, fg, fb},
-        WorldVertex{x0, h,    z0, fr, fg, fb},
-        WorldVertex{x1, h,    z0, fr, fg, fb});
+        WorldVertex{x1, 0.0F, z0, fr, fg, fb, alpha},
+        WorldVertex{x0, 0.0F, z0, fr, fg, fb, alpha},
+        WorldVertex{x0, h,    z0, fr, fg, fb, alpha},
+        WorldVertex{x1, h,    z0, fr, fg, fb, alpha});
 
     // East face (X+).
     constexpr float sr = 0.40F;
@@ -95,23 +128,23 @@ void emit_wall_tile(WorldMesh& mesh, float x0, float z0, float x1, float z1)
     constexpr float sb = 0.13F;
     emit_quad(
         mesh,
-        WorldVertex{x1, 0.0F, z0, sr, sg, sb},
-        WorldVertex{x1, 0.0F, z1, sr, sg, sb},
-        WorldVertex{x1, h,    z1, sr, sg, sb},
-        WorldVertex{x1, h,    z0, sr, sg, sb});
+        WorldVertex{x1, 0.0F, z0, sr, sg, sb, alpha},
+        WorldVertex{x1, 0.0F, z1, sr, sg, sb, alpha},
+        WorldVertex{x1, h,    z1, sr, sg, sb, alpha},
+        WorldVertex{x1, h,    z0, sr, sg, sb, alpha});
 
     // West face (X-).
     emit_quad(
         mesh,
-        WorldVertex{x0, 0.0F, z1, sr, sg, sb},
-        WorldVertex{x0, 0.0F, z0, sr, sg, sb},
-        WorldVertex{x0, h,    z0, sr, sg, sb},
-        WorldVertex{x0, h,    z1, sr, sg, sb});
+        WorldVertex{x0, 0.0F, z1, sr, sg, sb, alpha},
+        WorldVertex{x0, 0.0F, z0, sr, sg, sb, alpha},
+        WorldVertex{x0, h,    z0, sr, sg, sb, alpha},
+        WorldVertex{x0, h,    z1, sr, sg, sb, alpha});
 }
 
 } // namespace
 
-WorldMesh build_world_mesh(const Scene& scene, const DungeonMap& map)
+WorldMesh build_world_mesh(const Scene& scene, const DungeonMap& map, float camera_x, float camera_z)
 {
     WorldMesh mesh{};
 
@@ -177,7 +210,8 @@ WorldMesh build_world_mesh(const Scene& scene, const DungeonMap& map)
     {
         if (t.m_is_wall)
         {
-            emit_wall_tile(mesh, t.m_x0, t.m_z0, t.m_x1, t.m_z1);
+            const float alpha = calculate_occlusion_alpha(t.m_x0, t.m_z0, t.m_x1, t.m_z1, camera_x, camera_z);
+            emit_wall_tile(mesh, t.m_x0, t.m_z0, t.m_x1, t.m_z1, alpha);
         }
         else
         {

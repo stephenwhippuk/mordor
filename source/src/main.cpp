@@ -331,7 +331,7 @@ int main(int argc, char** argv)
         world_scene.m_spatial_index.m_cells.size());
 
     const mordor::WorldMesh world_mesh =
-        mordor::build_world_mesh(world_scene, handcrafted_map);
+        mordor::build_world_mesh(world_scene, handcrafted_map, 256.0F, 256.0F);
     if (world_mesh.m_vertices.empty() || world_mesh.m_indices.empty())
     {
         MORDOR_LOG_CRITICAL("Failed to build world mesh from scene/map");

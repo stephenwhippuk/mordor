@@ -34,7 +34,9 @@ struct WorldMesh
 /// Build floor and wall geometry from scene node world bounds and map tile data.
 /// Floor tiles emit a flat quad at Y = 0.
 /// Wall tiles emit a box (top face + four side faces) from Y = 0 to Y = k_wall_height.
+/// Wall alpha is calculated to fade walls near the camera for interaction readability.
 /// Tiles are emitted in ascending payload-index (row-major) order for deterministic output.
-WorldMesh build_world_mesh(const Scene& scene, const DungeonMap& map);
+/// camera_x, camera_z: Position of the camera/observer in world space for occlusion fade.
+WorldMesh build_world_mesh(const Scene& scene, const DungeonMap& map, float camera_x, float camera_z);
 
 } // namespace mordor
