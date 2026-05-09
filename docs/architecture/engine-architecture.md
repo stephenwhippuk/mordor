@@ -67,6 +67,7 @@ Current baseline:
 11. Screen-space HUD is composited as deterministic overlay surfaces over the world pass.
 12. Per-vertex alpha channel support: world geometry vertices now include opacity (alpha) for occlusion handling; OpenGL blending (GL_SRC_ALPHA / GL_ONE_MINUS_SRC_ALPHA) is enabled during world drawing to fade foreground walls and improve interaction readability.
 13. Occlusion fade now uses actor-centric gating: only wall geometry between camera and active actor anchor, within a corridor and radius gate, is faded.
+14. Wall CSG-style mesh emission now merges contiguous coplanar wall regions into visible surfaces (top planes and boundary side runs) instead of per-block wall cubes, reducing polygon count and establishing a better foundation for static mesh and collision acceleration structures.
 
 Ordering note:
 1. Ship stable world rendering before advanced visual effects.

@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
 namespace mordor {
 
@@ -19,10 +20,58 @@ struct TileGeomInput
     float m_z1{0.0F};
     bool  m_is_wall{false};
     char  m_symbol{'.'};
-    int   m_col{0};
-    int   m_row{0};
     int   m_sort_key{0}; // payload_index = row * width + col
 };
+
+enum class WallMaterial : uint8_t
+{
+    None = 0,
+    Stone,
+    Door,
+};
+
+struct WallPalette
+{
+    float m_top_r{0.0F};
+    float m_top_g{0.0F};
+    float m_top_b{0.0F};
+    float m_primary_r{0.0F};
+    float m_primary_g{0.0F};
+    float m_primary_b{0.0F};
+    float m_secondary_r{0.0F};
+    float m_secondary_g{0.0F};
+    float m_secondary_b{0.0F};
+};
+
+WallPalette wall_palette(WallMaterial material)
+{
+    if (material == WallMaterial::Door)
+    {
+        return WallPalette{
+            .m_top_r = 0.52F,
+            .m_top_g = 0.34F,
+            .m_top_b = 0.18F,
+            .m_primary_r = 0.43F,
+            .m_primary_g = 0.27F,
+            .m_primary_b = 0.14F,
+            .m_secondary_r = 0.35F,
+            .m_secondary_g = 0.22F,
+            .m_secondary_b = 0.12F,
+        };
+    }
+
+    return WallPalette{
+        .m_top_r = 0.62F,
+        .m_top_g = 0.20F,
+        .m_top_b = 0.20F,
+        .m_primary_r = 0.50F,
+        .m_primary_g = 0.16F,
+        .m_primary_b = 0.16F,
+        .m_secondary_r = 0.40F,
+        .m_secondary_g = 0.13F,
+        .m_secondary_b = 0.13F,
+    };
+}
 
 void emit_quad(
     WorldMesh&  mesh,
@@ -37,13 +86,15 @@ void emit_quad(
     mesh.m_vertices.push_back(v1);
     mesh.m_vertices.push_back(v2);
     mesh.m_vertices.push_back(v3);
-    // Two CCW triangles sharing diagonal v0-v2.
+
     index_buffer.push_back(base + 0U);
     index_buffer.push_back(base + 1U);
     index_buffer.push_back(base + 2U);
     index_buffer.push_back(base + 0U);
     index_buffer.push_back(base + 2U);
     index_buffer.push_back(base + 3U);
+
+    // Keep combined index stream for diagnostics/tests.
     mesh.m_indices.push_back(base + 0U);
     mesh.m_indices.push_back(base + 1U);
     mesh.m_indices.push_back(base + 2U);
@@ -147,7 +198,6 @@ float calculate_occlusion_alpha(
     const float projected = ((cam_to_wall_x * seg_dx) + (cam_to_wall_z * seg_dz)) / seg_len_sq;
     if (projected <= 0.0F || projected >= 1.0F)
     {
-        // Only fade occluders between camera and actor anchor.
         return 1.0F;
     }
 
@@ -183,7 +233,6 @@ float calculate_occlusion_alpha(
 
 void emit_floor_tile(WorldMesh& mesh, std::vector<uint32_t>& index_buffer, float x0, float z0, float x1, float z1)
 {
-    // Flat quad at Y = 0, CCW winding viewed from above (+Y).
     constexpr float r = 0.18F;
     constexpr float g = 0.43F;
     constexpr float b = 0.24F;
@@ -196,7 +245,7 @@ void emit_floor_tile(WorldMesh& mesh, std::vector<uint32_t>& index_buffer, float
         WorldVertex{x0, 0.0F, z1, r, g, b});
 }
 
-void emit_wall_tile(
+void emit_wall_top_face(
     WorldMesh& mesh,
     std::vector<uint32_t>& index_buffer,
     float x0,
@@ -204,172 +253,133 @@ void emit_wall_tile(
     float x1,
     float z1,
     float alpha,
-    bool emit_south_face,
-    bool emit_north_face,
-    bool emit_east_face,
-    bool emit_west_face)
+    WallMaterial material)
 {
     const float h = k_wall_height;
+    const WallPalette p = wall_palette(material);
 
-    // Top face — slightly lighter stone.
-    constexpr float tr = 0.62F;
-    constexpr float tg = 0.20F;
-    constexpr float tb = 0.20F;
     emit_quad(
         mesh,
         index_buffer,
-        WorldVertex{x0, h, z0, tr, tg, tb, alpha},
-        WorldVertex{x1, h, z0, tr, tg, tb, alpha},
-        WorldVertex{x1, h, z1, tr, tg, tb, alpha},
-        WorldVertex{x0, h, z1, tr, tg, tb, alpha});
-
-    // South face (Z+).
-    constexpr float fr = 0.50F;
-    constexpr float fg = 0.16F;
-    constexpr float fb = 0.16F;
-    if (emit_south_face)
-    {
-        emit_quad(
-            mesh,
-            index_buffer,
-            WorldVertex{x0, 0.0F, z1, fr, fg, fb, alpha},
-            WorldVertex{x1, 0.0F, z1, fr, fg, fb, alpha},
-            WorldVertex{x1, h,    z1, fr, fg, fb, alpha},
-            WorldVertex{x0, h,    z1, fr, fg, fb, alpha});
-    }
-
-    // North face (Z-).
-    if (emit_north_face)
-    {
-        emit_quad(
-            mesh,
-            index_buffer,
-            WorldVertex{x1, 0.0F, z0, fr, fg, fb, alpha},
-            WorldVertex{x0, 0.0F, z0, fr, fg, fb, alpha},
-            WorldVertex{x0, h,    z0, fr, fg, fb, alpha},
-            WorldVertex{x1, h,    z0, fr, fg, fb, alpha});
-    }
-
-    // East face (X+).
-    constexpr float sr = 0.40F;
-    constexpr float sg = 0.13F;
-    constexpr float sb = 0.13F;
-    if (emit_east_face)
-    {
-        emit_quad(
-            mesh,
-            index_buffer,
-            WorldVertex{x1, 0.0F, z0, sr, sg, sb, alpha},
-            WorldVertex{x1, 0.0F, z1, sr, sg, sb, alpha},
-            WorldVertex{x1, h,    z1, sr, sg, sb, alpha},
-            WorldVertex{x1, h,    z0, sr, sg, sb, alpha});
-    }
-
-    // West face (X-).
-    if (emit_west_face)
-    {
-        emit_quad(
-            mesh,
-            index_buffer,
-            WorldVertex{x0, 0.0F, z1, sr, sg, sb, alpha},
-            WorldVertex{x0, 0.0F, z0, sr, sg, sb, alpha},
-            WorldVertex{x0, h,    z0, sr, sg, sb, alpha},
-            WorldVertex{x0, h,    z1, sr, sg, sb, alpha});
-    }
+        WorldVertex{x0, h, z0, p.m_top_r, p.m_top_g, p.m_top_b, alpha},
+        WorldVertex{x1, h, z0, p.m_top_r, p.m_top_g, p.m_top_b, alpha},
+        WorldVertex{x1, h, z1, p.m_top_r, p.m_top_g, p.m_top_b, alpha},
+        WorldVertex{x0, h, z1, p.m_top_r, p.m_top_g, p.m_top_b, alpha});
 }
 
-void emit_door_tile(
+void emit_wall_south_face(
     WorldMesh& mesh,
     std::vector<uint32_t>& index_buffer,
     float x0,
-    float z0,
+    float z,
     float x1,
-    float z1,
     float alpha,
-    bool emit_south_face,
-    bool emit_north_face,
-    bool emit_east_face,
-    bool emit_west_face)
+    WallMaterial material)
 {
     const float h = k_wall_height;
+    const WallPalette p = wall_palette(material);
 
-    // Brown wooden door palette.
-    constexpr float tr = 0.52F;
-    constexpr float tg = 0.34F;
-    constexpr float tb = 0.18F;
     emit_quad(
         mesh,
         index_buffer,
-        WorldVertex{x0, h, z0, tr, tg, tb, alpha},
-        WorldVertex{x1, h, z0, tr, tg, tb, alpha},
-        WorldVertex{x1, h, z1, tr, tg, tb, alpha},
-        WorldVertex{x0, h, z1, tr, tg, tb, alpha});
-
-    constexpr float fr = 0.43F;
-    constexpr float fg = 0.27F;
-    constexpr float fb = 0.14F;
-    if (emit_south_face)
-    {
-        emit_quad(
-            mesh,
-            index_buffer,
-            WorldVertex{x0, 0.0F, z1, fr, fg, fb, alpha},
-            WorldVertex{x1, 0.0F, z1, fr, fg, fb, alpha},
-            WorldVertex{x1, h,    z1, fr, fg, fb, alpha},
-            WorldVertex{x0, h,    z1, fr, fg, fb, alpha});
-    }
-
-    if (emit_north_face)
-    {
-        emit_quad(
-            mesh,
-            index_buffer,
-            WorldVertex{x1, 0.0F, z0, fr, fg, fb, alpha},
-            WorldVertex{x0, 0.0F, z0, fr, fg, fb, alpha},
-            WorldVertex{x0, h,    z0, fr, fg, fb, alpha},
-            WorldVertex{x1, h,    z0, fr, fg, fb, alpha});
-    }
-
-    constexpr float sr = 0.35F;
-    constexpr float sg = 0.22F;
-    constexpr float sb = 0.12F;
-    if (emit_east_face)
-    {
-        emit_quad(
-            mesh,
-            index_buffer,
-            WorldVertex{x1, 0.0F, z0, sr, sg, sb, alpha},
-            WorldVertex{x1, 0.0F, z1, sr, sg, sb, alpha},
-            WorldVertex{x1, h,    z1, sr, sg, sb, alpha},
-            WorldVertex{x1, h,    z0, sr, sg, sb, alpha});
-    }
-
-    if (emit_west_face)
-    {
-        emit_quad(
-            mesh,
-            index_buffer,
-            WorldVertex{x0, 0.0F, z1, sr, sg, sb, alpha},
-            WorldVertex{x0, 0.0F, z0, sr, sg, sb, alpha},
-            WorldVertex{x0, h,    z0, sr, sg, sb, alpha},
-            WorldVertex{x0, h,    z1, sr, sg, sb, alpha});
-    }
+        WorldVertex{x0, 0.0F, z, p.m_primary_r, p.m_primary_g, p.m_primary_b, alpha},
+        WorldVertex{x1, 0.0F, z, p.m_primary_r, p.m_primary_g, p.m_primary_b, alpha},
+        WorldVertex{x1, h,    z, p.m_primary_r, p.m_primary_g, p.m_primary_b, alpha},
+        WorldVertex{x0, h,    z, p.m_primary_r, p.m_primary_g, p.m_primary_b, alpha});
 }
 
-bool tile_blocks_movement(const DungeonMap& map, int col, int row)
+void emit_wall_north_face(
+    WorldMesh& mesh,
+    std::vector<uint32_t>& index_buffer,
+    float x0,
+    float z,
+    float x1,
+    float alpha,
+    WallMaterial material)
 {
-    if (col < 0 || row < 0 || col >= map.m_width || row >= map.m_height)
+    const float h = k_wall_height;
+    const WallPalette p = wall_palette(material);
+
+    emit_quad(
+        mesh,
+        index_buffer,
+        WorldVertex{x1, 0.0F, z, p.m_primary_r, p.m_primary_g, p.m_primary_b, alpha},
+        WorldVertex{x0, 0.0F, z, p.m_primary_r, p.m_primary_g, p.m_primary_b, alpha},
+        WorldVertex{x0, h,    z, p.m_primary_r, p.m_primary_g, p.m_primary_b, alpha},
+        WorldVertex{x1, h,    z, p.m_primary_r, p.m_primary_g, p.m_primary_b, alpha});
+}
+
+void emit_wall_east_face(
+    WorldMesh& mesh,
+    std::vector<uint32_t>& index_buffer,
+    float x,
+    float z0,
+    float z1,
+    float alpha,
+    WallMaterial material)
+{
+    const float h = k_wall_height;
+    const WallPalette p = wall_palette(material);
+
+    emit_quad(
+        mesh,
+        index_buffer,
+        WorldVertex{x, 0.0F, z0, p.m_secondary_r, p.m_secondary_g, p.m_secondary_b, alpha},
+        WorldVertex{x, 0.0F, z1, p.m_secondary_r, p.m_secondary_g, p.m_secondary_b, alpha},
+        WorldVertex{x, h,    z1, p.m_secondary_r, p.m_secondary_g, p.m_secondary_b, alpha},
+        WorldVertex{x, h,    z0, p.m_secondary_r, p.m_secondary_g, p.m_secondary_b, alpha});
+}
+
+void emit_wall_west_face(
+    WorldMesh& mesh,
+    std::vector<uint32_t>& index_buffer,
+    float x,
+    float z0,
+    float z1,
+    float alpha,
+    WallMaterial material)
+{
+    const float h = k_wall_height;
+    const WallPalette p = wall_palette(material);
+
+    emit_quad(
+        mesh,
+        index_buffer,
+        WorldVertex{x, 0.0F, z1, p.m_secondary_r, p.m_secondary_g, p.m_secondary_b, alpha},
+        WorldVertex{x, 0.0F, z0, p.m_secondary_r, p.m_secondary_g, p.m_secondary_b, alpha},
+        WorldVertex{x, h,    z0, p.m_secondary_r, p.m_secondary_g, p.m_secondary_b, alpha},
+        WorldVertex{x, h,    z1, p.m_secondary_r, p.m_secondary_g, p.m_secondary_b, alpha});
+}
+
+std::size_t tile_index_for(int width, int col, int row)
+{
+    return static_cast<std::size_t>((row * width) + col);
+}
+
+bool tile_in_bounds(const DungeonMap& map, int col, int row)
+{
+    return col >= 0 && row >= 0 && col < map.m_width && row < map.m_height;
+}
+
+WallMaterial wall_material_at(const DungeonMap& map, int col, int row)
+{
+    if (!tile_in_bounds(map, col, row))
     {
-        return false;
+        return WallMaterial::None;
     }
 
-    const std::size_t idx = static_cast<std::size_t>((row * map.m_width) + col);
-    if (idx >= map.m_tiles.size())
+    const std::size_t idx = tile_index_for(map.m_width, col, row);
+    if (idx >= map.m_tiles.size() || !map.m_tiles[idx].m_blocks_movement)
     {
-        return false;
+        return WallMaterial::None;
     }
 
-    return map.m_tiles[idx].m_blocks_movement;
+    return map.m_tiles[idx].m_symbol == 'D' ? WallMaterial::Door : WallMaterial::Stone;
+}
+
+int alpha_bucket(float alpha)
+{
+    return (alpha < 0.999F) ? 1 : 0;
 }
 
 void emit_marker_sphere(
@@ -430,12 +440,270 @@ void emit_marker_sphere(
             index_buffer.push_back(i1);
             index_buffer.push_back(i3);
             index_buffer.push_back(i2);
+
             mesh.m_indices.push_back(i0);
             mesh.m_indices.push_back(i1);
             mesh.m_indices.push_back(i2);
             mesh.m_indices.push_back(i1);
             mesh.m_indices.push_back(i3);
             mesh.m_indices.push_back(i2);
+        }
+    }
+}
+
+void emit_merged_walls(
+    WorldMesh& mesh,
+    const DungeonMap& map,
+    float camera_x,
+    float camera_z,
+    float anchor_x,
+    float anchor_z)
+{
+    const int width = map.m_width;
+    const int height = map.m_height;
+    if (width <= 0 || height <= 0)
+    {
+        return;
+    }
+
+    const std::size_t tile_count = static_cast<std::size_t>(width * height);
+    std::vector<WallMaterial> materials(tile_count, WallMaterial::None);
+    std::vector<float> wall_alpha(tile_count, 1.0F);
+
+    for (int row = 0; row < height; ++row)
+    {
+        for (int col = 0; col < width; ++col)
+        {
+            const std::size_t idx = tile_index_for(width, col, row);
+            const WallMaterial material = wall_material_at(map, col, row);
+            materials[idx] = material;
+            if (material == WallMaterial::None)
+            {
+                continue;
+            }
+
+            const float x0 = static_cast<float>(col) * k_scene_tile_world_size;
+            const float z0 = static_cast<float>(row) * k_scene_tile_world_size;
+            const float x1 = x0 + k_scene_tile_world_size;
+            const float z1 = z0 + k_scene_tile_world_size;
+            wall_alpha[idx] = calculate_occlusion_alpha(
+                x0,
+                z0,
+                x1,
+                z1,
+                camera_x,
+                camera_z,
+                anchor_x,
+                anchor_z);
+        }
+    }
+
+    const auto material_at = [&materials, width, height](int col, int row) {
+        if (col < 0 || row < 0 || col >= width || row >= height)
+        {
+            return WallMaterial::None;
+        }
+        return materials[tile_index_for(width, col, row)];
+    };
+
+    const auto alpha_at = [&wall_alpha, width](int col, int row) {
+        return wall_alpha[tile_index_for(width, col, row)];
+    };
+
+    std::vector<uint8_t> top_visited(tile_count, 0U);
+    for (int row = 0; row < height; ++row)
+    {
+        for (int col = 0; col < width; ++col)
+        {
+            const std::size_t root_idx = tile_index_for(width, col, row);
+            const WallMaterial root_material = materials[root_idx];
+            if (root_material == WallMaterial::None || top_visited[root_idx] != 0U)
+            {
+                continue;
+            }
+
+            const int root_bucket = alpha_bucket(wall_alpha[root_idx]);
+            int run_width = 1;
+            while ((col + run_width) < width)
+            {
+                const std::size_t idx = tile_index_for(width, col + run_width, row);
+                if (top_visited[idx] != 0U || materials[idx] != root_material
+                    || alpha_bucket(wall_alpha[idx]) != root_bucket)
+                {
+                    break;
+                }
+                ++run_width;
+            }
+
+            int run_height = 1;
+            bool can_extend = true;
+            while ((row + run_height) < height && can_extend)
+            {
+                for (int offset = 0; offset < run_width; ++offset)
+                {
+                    const std::size_t idx = tile_index_for(width, col + offset, row + run_height);
+                    if (top_visited[idx] != 0U || materials[idx] != root_material
+                        || alpha_bucket(wall_alpha[idx]) != root_bucket)
+                    {
+                        can_extend = false;
+                        break;
+                    }
+                }
+                if (can_extend)
+                {
+                    ++run_height;
+                }
+            }
+
+            float region_alpha = wall_alpha[root_idx];
+            for (int r = 0; r < run_height; ++r)
+            {
+                for (int c = 0; c < run_width; ++c)
+                {
+                    const std::size_t idx = tile_index_for(width, col + c, row + r);
+                    top_visited[idx] = 1U;
+                    region_alpha = std::min(region_alpha, wall_alpha[idx]);
+                }
+            }
+
+            std::vector<uint32_t>& index_buffer =
+                (region_alpha < 0.999F) ? mesh.m_transparent_indices : mesh.m_opaque_indices;
+
+            const float x0 = static_cast<float>(col) * k_scene_tile_world_size;
+            const float z0 = static_cast<float>(row) * k_scene_tile_world_size;
+            const float x1 = static_cast<float>(col + run_width) * k_scene_tile_world_size;
+            const float z1 = static_cast<float>(row + run_height) * k_scene_tile_world_size;
+            emit_wall_top_face(mesh, index_buffer, x0, z0, x1, z1, region_alpha, root_material);
+        }
+    }
+
+    for (int row = 0; row < height; ++row)
+    {
+        int col = 0;
+        while (col < width)
+        {
+            const WallMaterial material = material_at(col, row);
+            if (material == WallMaterial::None || material_at(col, row - 1) != WallMaterial::None)
+            {
+                ++col;
+                continue;
+            }
+
+            const int bucket = alpha_bucket(alpha_at(col, row));
+            int run_start = col;
+            float region_alpha = alpha_at(col, row);
+            ++col;
+            while (col < width
+                && material_at(col, row) == material
+                && material_at(col, row - 1) == WallMaterial::None
+                && alpha_bucket(alpha_at(col, row)) == bucket)
+            {
+                region_alpha = std::min(region_alpha, alpha_at(col, row));
+                ++col;
+            }
+
+            std::vector<uint32_t>& index_buffer =
+                (region_alpha < 0.999F) ? mesh.m_transparent_indices : mesh.m_opaque_indices;
+            const float x0 = static_cast<float>(run_start) * k_scene_tile_world_size;
+            const float x1 = static_cast<float>(col) * k_scene_tile_world_size;
+            const float z = static_cast<float>(row) * k_scene_tile_world_size;
+            emit_wall_north_face(mesh, index_buffer, x0, z, x1, region_alpha, material);
+        }
+
+        col = 0;
+        while (col < width)
+        {
+            const WallMaterial material = material_at(col, row);
+            if (material == WallMaterial::None || material_at(col, row + 1) != WallMaterial::None)
+            {
+                ++col;
+                continue;
+            }
+
+            const int bucket = alpha_bucket(alpha_at(col, row));
+            int run_start = col;
+            float region_alpha = alpha_at(col, row);
+            ++col;
+            while (col < width
+                && material_at(col, row) == material
+                && material_at(col, row + 1) == WallMaterial::None
+                && alpha_bucket(alpha_at(col, row)) == bucket)
+            {
+                region_alpha = std::min(region_alpha, alpha_at(col, row));
+                ++col;
+            }
+
+            std::vector<uint32_t>& index_buffer =
+                (region_alpha < 0.999F) ? mesh.m_transparent_indices : mesh.m_opaque_indices;
+            const float x0 = static_cast<float>(run_start) * k_scene_tile_world_size;
+            const float x1 = static_cast<float>(col) * k_scene_tile_world_size;
+            const float z = static_cast<float>(row + 1) * k_scene_tile_world_size;
+            emit_wall_south_face(mesh, index_buffer, x0, z, x1, region_alpha, material);
+        }
+    }
+
+    for (int col = 0; col < width; ++col)
+    {
+        int row = 0;
+        while (row < height)
+        {
+            const WallMaterial material = material_at(col, row);
+            if (material == WallMaterial::None || material_at(col + 1, row) != WallMaterial::None)
+            {
+                ++row;
+                continue;
+            }
+
+            const int bucket = alpha_bucket(alpha_at(col, row));
+            int run_start = row;
+            float region_alpha = alpha_at(col, row);
+            ++row;
+            while (row < height
+                && material_at(col, row) == material
+                && material_at(col + 1, row) == WallMaterial::None
+                && alpha_bucket(alpha_at(col, row)) == bucket)
+            {
+                region_alpha = std::min(region_alpha, alpha_at(col, row));
+                ++row;
+            }
+
+            std::vector<uint32_t>& index_buffer =
+                (region_alpha < 0.999F) ? mesh.m_transparent_indices : mesh.m_opaque_indices;
+            const float x = static_cast<float>(col + 1) * k_scene_tile_world_size;
+            const float z0 = static_cast<float>(run_start) * k_scene_tile_world_size;
+            const float z1 = static_cast<float>(row) * k_scene_tile_world_size;
+            emit_wall_east_face(mesh, index_buffer, x, z0, z1, region_alpha, material);
+        }
+
+        row = 0;
+        while (row < height)
+        {
+            const WallMaterial material = material_at(col, row);
+            if (material == WallMaterial::None || material_at(col - 1, row) != WallMaterial::None)
+            {
+                ++row;
+                continue;
+            }
+
+            const int bucket = alpha_bucket(alpha_at(col, row));
+            int run_start = row;
+            float region_alpha = alpha_at(col, row);
+            ++row;
+            while (row < height
+                && material_at(col, row) == material
+                && material_at(col - 1, row) == WallMaterial::None
+                && alpha_bucket(alpha_at(col, row)) == bucket)
+            {
+                region_alpha = std::min(region_alpha, alpha_at(col, row));
+                ++row;
+            }
+
+            std::vector<uint32_t>& index_buffer =
+                (region_alpha < 0.999F) ? mesh.m_transparent_indices : mesh.m_opaque_indices;
+            const float x = static_cast<float>(col) * k_scene_tile_world_size;
+            const float z0 = static_cast<float>(run_start) * k_scene_tile_world_size;
+            const float z1 = static_cast<float>(row) * k_scene_tile_world_size;
+            emit_wall_west_face(mesh, index_buffer, x, z0, z1, region_alpha, material);
         }
     }
 }
@@ -457,8 +725,6 @@ WorldMesh build_world_mesh(
         return mesh;
     }
 
-    // Collect renderable static geometry nodes that reference a valid tile.
-    // Scene XY bounds map to 3D XZ plane; 3D Y is the vertical axis.
     const uint32_t renderable_static_flags =
         scene_node_category_bits(SceneNodeCategory::StaticGeometry)
         | scene_node_category_bits(SceneNodeCategory::Renderable);
@@ -468,12 +734,7 @@ WorldMesh build_world_mesh(
 
     for (const SceneNode& node : scene.m_nodes)
     {
-        if (!scene_node_has_flags(node, renderable_static_flags))
-        {
-            continue;
-        }
-
-        if (node.m_payload_index < 0)
+        if (!scene_node_has_flags(node, renderable_static_flags) || node.m_payload_index < 0)
         {
             continue;
         }
@@ -485,9 +746,6 @@ WorldMesh build_world_mesh(
         }
 
         const DungeonTile& tile = map.m_tiles[tile_index];
-
-        // Scene uses XY plane (X = col * tile_size, Y = row * tile_size).
-        // Remap: scene X -> 3D X, scene Y -> 3D Z.
         tile_inputs.push_back(TileGeomInput{
             .m_x0 = node.m_world_bounds.m_min.m_x,
             .m_z0 = node.m_world_bounds.m_min.m_y,
@@ -495,13 +753,10 @@ WorldMesh build_world_mesh(
             .m_z1 = node.m_world_bounds.m_max.m_y,
             .m_is_wall  = tile.m_blocks_movement,
             .m_symbol = tile.m_symbol,
-            .m_col = tile.m_col,
-            .m_row = tile.m_row,
             .m_sort_key = node.m_payload_index,
         });
     }
 
-    // Sort by payload index (row-major) for deterministic draw ordering.
     std::sort(
         tile_inputs.begin(),
         tile_inputs.end(),
@@ -509,82 +764,36 @@ WorldMesh build_world_mesh(
             return a.m_sort_key < b.m_sort_key;
         });
 
-    // Reserve upper-bound capacity: wall = 20 verts + 30 indices, floor = 4 + 6.
-    mesh.m_vertices.reserve(tile_inputs.size() * 20);
-    mesh.m_indices.reserve(tile_inputs.size() * 30);
-    mesh.m_opaque_indices.reserve(tile_inputs.size() * 24);
-    mesh.m_transparent_indices.reserve(tile_inputs.size() * 12);
+    mesh.m_vertices.reserve(tile_inputs.size() * 12);
+    mesh.m_indices.reserve(tile_inputs.size() * 18);
+    mesh.m_opaque_indices.reserve(tile_inputs.size() * 16);
+    mesh.m_transparent_indices.reserve(tile_inputs.size() * 8);
+
+    emit_merged_walls(mesh, map, camera_x, camera_z, anchor_x, anchor_z);
 
     for (const TileGeomInput& t : tile_inputs)
     {
         if (t.m_is_wall)
         {
-            const bool has_north_wall = tile_blocks_movement(map, t.m_col, t.m_row - 1);
-            const bool has_south_wall = tile_blocks_movement(map, t.m_col, t.m_row + 1);
-            const bool has_east_wall = tile_blocks_movement(map, t.m_col + 1, t.m_row);
-            const bool has_west_wall = tile_blocks_movement(map, t.m_col - 1, t.m_row);
-
-            const float alpha = calculate_occlusion_alpha(
-                t.m_x0,
-                t.m_z0,
-                t.m_x1,
-                t.m_z1,
-                camera_x,
-                camera_z,
-                anchor_x,
-                anchor_z);
-            std::vector<uint32_t>& wall_index_buffer =
-                (alpha < 0.999F) ? mesh.m_transparent_indices : mesh.m_opaque_indices;
-            if (t.m_symbol == 'D')
-            {
-                emit_door_tile(
-                    mesh,
-                    wall_index_buffer,
-                    t.m_x0,
-                    t.m_z0,
-                    t.m_x1,
-                    t.m_z1,
-                    alpha,
-                    !has_south_wall,
-                    !has_north_wall,
-                    !has_east_wall,
-                    !has_west_wall);
-            }
-            else
-            {
-                emit_wall_tile(
-                    mesh,
-                    wall_index_buffer,
-                    t.m_x0,
-                    t.m_z0,
-                    t.m_x1,
-                    t.m_z1,
-                    alpha,
-                    !has_south_wall,
-                    !has_north_wall,
-                    !has_east_wall,
-                    !has_west_wall);
-            }
+            continue;
         }
-        else
-        {
-            emit_floor_tile(mesh, mesh.m_opaque_indices, t.m_x0, t.m_z0, t.m_x1, t.m_z1);
 
-            const float cx = (t.m_x0 + t.m_x1) * 0.5F;
-            const float cz = (t.m_z0 + t.m_z1) * 0.5F;
-            constexpr float marker_radius = 10.0F;
-            if (t.m_symbol == 'A')
-            {
-                emit_marker_sphere(mesh, mesh.m_opaque_indices, cx, cz, marker_radius, 0.20F, 0.45F, 0.95F); // Player: blue
-            }
-            else if (t.m_symbol == 'K')
-            {
-                emit_marker_sphere(mesh, mesh.m_opaque_indices, cx, cz, marker_radius, 0.95F, 0.85F, 0.20F); // Key: yellow
-            }
-            else if (t.m_symbol == 'S')
-            {
-                emit_marker_sphere(mesh, mesh.m_opaque_indices, cx, cz, marker_radius, 0.92F, 0.92F, 0.92F); // Switch: white
-            }
+        emit_floor_tile(mesh, mesh.m_opaque_indices, t.m_x0, t.m_z0, t.m_x1, t.m_z1);
+
+        const float cx = (t.m_x0 + t.m_x1) * 0.5F;
+        const float cz = (t.m_z0 + t.m_z1) * 0.5F;
+        constexpr float marker_radius = 10.0F;
+        if (t.m_symbol == 'A')
+        {
+            emit_marker_sphere(mesh, mesh.m_opaque_indices, cx, cz, marker_radius, 0.20F, 0.45F, 0.95F);
+        }
+        else if (t.m_symbol == 'K')
+        {
+            emit_marker_sphere(mesh, mesh.m_opaque_indices, cx, cz, marker_radius, 0.95F, 0.85F, 0.20F);
+        }
+        else if (t.m_symbol == 'S')
+        {
+            emit_marker_sphere(mesh, mesh.m_opaque_indices, cx, cz, marker_radius, 0.92F, 0.92F, 0.92F);
         }
     }
 
