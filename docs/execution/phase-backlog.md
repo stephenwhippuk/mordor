@@ -79,6 +79,7 @@ Must be resolved before rotation is considered production-quality. Tracked for P
 | P5-03 | Implement mouse-driven tile/entity selection and picking | P1-08, P5-01 | High | Complete | plan/rendering-engine-plan.md |
 | P5-04 | Implement occlusion-aware wall fade/hide for interaction readability | P3-01, P5-02, P5-03 | High | Complete | plan/rendering-engine-plan.md |
 | P5-05 | Add frustum culling and render submission metrics | P1-08, P5-01 | Medium | Complete | plan/rendering-engine-plan.md |
+| P5-06 | Rework occlusion to actor-centric corridor and add keyboard player-move probe controls | P5-04 | High | Complete | execution/next-steps.md |
 
 ### Known Limitations — Post P5
 

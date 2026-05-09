@@ -415,6 +415,23 @@ void Renderer::update_camera_controls(double dt_seconds)
 #endif
 }
 
+bool Renderer::is_input_action_active(InputAction action) const
+{
+#if MORDOR_HAS_GLFW
+    if (m_window == nullptr)
+    {
+        return false;
+    }
+
+    return m_input_bindings.is_action_active(action, [this](int key) {
+        return key_down(m_window, key);
+    });
+#else
+    (void)action;
+    return false;
+#endif
+}
+
 CameraState Renderer::camera_state() const
 {
     return m_camera;

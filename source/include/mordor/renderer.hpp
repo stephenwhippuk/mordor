@@ -83,6 +83,7 @@ public:
 
     bool should_close() const;
     void update_camera_controls(double dt_seconds);
+    bool is_input_action_active(InputAction action) const;
     CameraState camera_state() const;
     FramebufferSize framebuffer_size() const;
     void mouse_position(int& out_x, int& out_y) const;  // Current cursor position in screen space

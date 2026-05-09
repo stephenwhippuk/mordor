@@ -43,36 +43,64 @@ void emit_quad(
     mesh.m_indices.push_back(base + 3U);
 }
 
-float calculate_occlusion_alpha(float wall_x0, float wall_z0, float wall_x1, float wall_z1, float camera_x, float camera_z)
+float calculate_occlusion_alpha(
+    float wall_x0,
+    float wall_z0,
+    float wall_x1,
+    float wall_z1,
+    float camera_x,
+    float camera_z,
+    float anchor_x,
+    float anchor_z)
 {
-    // Wall center in XZ plane.
     const float wall_cx = (wall_x0 + wall_x1) * 0.5F;
     const float wall_cz = (wall_z0 + wall_z1) * 0.5F;
 
-    // Distance from wall center to camera.
-    const float dx = camera_x - wall_cx;
-    const float dz = camera_z - wall_cz;
-    const float distance = std::sqrt(dx * dx + dz * dz);
-
-    // Fade range: walls closer than 200 units start fading, reach minimum at 100 units.
-    // min_alpha = 0.3 (wall still partially visible), max_alpha = 1.0 (fully opaque).
-    constexpr float fade_start = 200.0F;  // Distance where fade begins
-    constexpr float fade_end   = 100.0F;  // Distance where fade reaches minimum
-    constexpr float min_alpha  = 0.3F;    // Minimum opacity (wall not invisible)
-    constexpr float max_alpha  = 1.0F;    // Maximum opacity (fully opaque)
-
-    if (distance >= fade_start)
+    const float seg_dx = anchor_x - camera_x;
+    const float seg_dz = anchor_z - camera_z;
+    const float seg_len_sq = (seg_dx * seg_dx) + (seg_dz * seg_dz);
+    if (seg_len_sq <= 1.0e-4F)
     {
-        return max_alpha;  // Far away: fully opaque
-    }
-    if (distance <= fade_end)
-    {
-        return min_alpha;  // Very close: barely visible
+        return 1.0F;
     }
 
-    // Linear fade between min and max.
-    const float t = (distance - fade_end) / (fade_start - fade_end);
-    return min_alpha + (max_alpha - min_alpha) * t;
+    const float cam_to_wall_x = wall_cx - camera_x;
+    const float cam_to_wall_z = wall_cz - camera_z;
+    const float projected = ((cam_to_wall_x * seg_dx) + (cam_to_wall_z * seg_dz)) / seg_len_sq;
+    if (projected <= 0.0F || projected >= 1.0F)
+    {
+        // Only fade occluders between camera and actor anchor.
+        return 1.0F;
+    }
+
+    const float closest_x = camera_x + (projected * seg_dx);
+    const float closest_z = camera_z + (projected * seg_dz);
+    const float lateral_dx = wall_cx - closest_x;
+    const float lateral_dz = wall_cz - closest_z;
+    const float lateral_dist = std::sqrt((lateral_dx * lateral_dx) + (lateral_dz * lateral_dz));
+
+    constexpr float corridor_half_width = k_scene_tile_world_size * 0.75F;
+    if (lateral_dist >= corridor_half_width)
+    {
+        return 1.0F;
+    }
+
+    const float to_anchor_dx = wall_cx - anchor_x;
+    const float to_anchor_dz = wall_cz - anchor_z;
+    const float dist_to_anchor = std::sqrt((to_anchor_dx * to_anchor_dx) + (to_anchor_dz * to_anchor_dz));
+    constexpr float occlusion_radius = k_scene_tile_world_size * 4.0F;
+    if (dist_to_anchor > occlusion_radius)
+    {
+        return 1.0F;
+    }
+
+    const float corridor_factor = 1.0F - std::clamp(lateral_dist / corridor_half_width, 0.0F, 1.0F);
+    const float radius_factor = 1.0F - std::clamp(dist_to_anchor / occlusion_radius, 0.0F, 1.0F);
+    const float fade_strength = std::clamp(corridor_factor * radius_factor, 0.0F, 1.0F);
+
+    constexpr float min_alpha = 0.30F;
+    constexpr float max_alpha = 1.00F;
+    return max_alpha - ((max_alpha - min_alpha) * fade_strength);
 }
 
 void emit_floor_tile(WorldMesh& mesh, float x0, float z0, float x1, float z1)
@@ -256,7 +284,13 @@ void emit_marker_sphere(
 
 } // namespace
 
-WorldMesh build_world_mesh(const Scene& scene, const DungeonMap& map, float camera_x, float camera_z)
+WorldMesh build_world_mesh(
+    const Scene& scene,
+    const DungeonMap& map,
+    float camera_x,
+    float camera_z,
+    float anchor_x,
+    float anchor_z)
 {
     WorldMesh mesh{};
 
@@ -323,7 +357,15 @@ WorldMesh build_world_mesh(const Scene& scene, const DungeonMap& map, float came
     {
         if (t.m_is_wall)
         {
-            const float alpha = calculate_occlusion_alpha(t.m_x0, t.m_z0, t.m_x1, t.m_z1, camera_x, camera_z);
+            const float alpha = calculate_occlusion_alpha(
+                t.m_x0,
+                t.m_z0,
+                t.m_x1,
+                t.m_z1,
+                camera_x,
+                camera_z,
+                anchor_x,
+                anchor_z);
             if (t.m_symbol == 'D')
             {
                 emit_door_tile(mesh, t.m_x0, t.m_z0, t.m_x1, t.m_z1, alpha);

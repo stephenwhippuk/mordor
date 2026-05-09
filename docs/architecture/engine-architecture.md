@@ -57,6 +57,7 @@ Current baseline:
 2. GLFW-based window/context bootstrap (decision 0004).
 3. Shader/VBO world rendering path submits floor and wall geometry from map/scene data as indexed 3D mesh data.
 4. Isometric-perspective camera with tunable pitch (0.1–1.48 rad) and orbit distance; yaw/zoom/pan/pitch controlled via input bindings (Q/E, R/F, T/G, WASD).
+5. Keyboard player-probe movement is mapped to arrow keys independently from camera controls to support occlusion/picking validation workflows.
 5. Screen-to-world projection for mouse cursor: converts screen coordinates to world space accounting for camera rotation, zoom, and viewport.
 6. Mouse-driven tile/entity picking: queries scene spatial index at cursor location; returns priority-ordered candidates based on distance; debug diagnostics log point hits, best hit, and neighborhood results every 120 ticks.
 7. Camera movement and controls consume input actions from the platform input binding layer rather than hard-coded key checks.
@@ -65,6 +66,7 @@ Current baseline:
 10. Perception debug overlays render LOS rays, hearing event traces, and fog visible/explored cells from simulation-owned query outputs.
 11. Screen-space HUD is composited as deterministic overlay surfaces over the world pass.
 12. Per-vertex alpha channel support: world geometry vertices now include opacity (alpha) for occlusion handling; OpenGL blending (GL_SRC_ALPHA / GL_ONE_MINUS_SRC_ALPHA) is enabled during world drawing to fade foreground walls and improve interaction readability.
+13. Occlusion fade now uses actor-centric gating: only wall geometry between camera and active actor anchor, within a corridor and radius gate, is faded.
 
 Ordering note:
 1. Ship stable world rendering before advanced visual effects.
