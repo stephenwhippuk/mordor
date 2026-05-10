@@ -17,6 +17,8 @@
 #include <cmath>
 #include <cstdlib>
 #include <exception>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <queue>
 #include <string>
@@ -47,12 +49,12 @@ DungeonMap build_test_map()
     map.m_width = 3;
     map.m_height = 2;
     map.m_tiles = {
-        DungeonTile{.m_col = 0, .m_row = 0, .m_blocks_movement = false, .m_symbol = '.'},
-        DungeonTile{.m_col = 1, .m_row = 0, .m_blocks_movement = true, .m_symbol = '#'},
-        DungeonTile{.m_col = 2, .m_row = 0, .m_blocks_movement = false, .m_symbol = '.'},
-        DungeonTile{.m_col = 0, .m_row = 1, .m_blocks_movement = false, .m_symbol = '.'},
-        DungeonTile{.m_col = 1, .m_row = 1, .m_blocks_movement = false, .m_symbol = '.'},
-        DungeonTile{.m_col = 2, .m_row = 1, .m_blocks_movement = false, .m_symbol = '.'},
+        DungeonTile{.m_col = 0, .m_row = 0, .m_collision_mask = k_tile_collision_none, .m_symbol = '.'},
+        DungeonTile{.m_col = 1, .m_row = 0, .m_collision_mask = k_tile_collision_solid, .m_symbol = '#'},
+        DungeonTile{.m_col = 2, .m_row = 0, .m_collision_mask = k_tile_collision_none, .m_symbol = '.'},
+        DungeonTile{.m_col = 0, .m_row = 1, .m_collision_mask = k_tile_collision_none, .m_symbol = '.'},
+        DungeonTile{.m_col = 1, .m_row = 1, .m_collision_mask = k_tile_collision_none, .m_symbol = '.'},
+        DungeonTile{.m_col = 2, .m_row = 1, .m_collision_mask = k_tile_collision_none, .m_symbol = '.'},
     };
     return map;
 }
@@ -1059,7 +1061,7 @@ void test_world_mesh_generation_rules()
     Scene scene{};
     check(build_scene_from_dungeon_map(map, scene), "scene build should succeed for world mesh tests");
 
-    const WorldMesh mesh = build_world_mesh(scene, map, 0.0F, 0.0F);
+    const WorldMesh mesh = build_world_mesh(scene, map, 0.0F, 0.0F, 0.0F, 0.0F);
 
     // build_test_map has 5 floor tiles and 1 wall tile.
     // floor emits 4 verts + 6 indices, wall emits 20 verts + 30 indices.
@@ -1072,7 +1074,7 @@ void test_world_mesh_generation_rules()
     check(mesh.m_indices.size() == expected_indices, "world mesh index count should match floor+wall emission");
 
     // Deterministic output: repeated builds should byte-match counts and index ordering.
-    const WorldMesh mesh_again = build_world_mesh(scene, map, 0.0F, 0.0F);
+    const WorldMesh mesh_again = build_world_mesh(scene, map, 0.0F, 0.0F, 0.0F, 0.0F);
     check(mesh_again.m_vertices.size() == mesh.m_vertices.size(), "world mesh build should be deterministic for vertices");
     check(mesh_again.m_indices.size() == mesh.m_indices.size(), "world mesh build should be deterministic for indices");
     check(mesh_again.m_indices == mesh.m_indices, "world mesh index ordering should be deterministic");
@@ -1089,26 +1091,108 @@ void test_world_mesh_generation_rules()
     check(found_raised_wall_vertex, "world mesh should contain raised vertices for wall geometry");
 
     DungeonMap symbol_map = build_test_map();
-    symbol_map.m_tiles[0].m_symbol = 'A';
     symbol_map.m_tiles[1].m_symbol = 'D';
-    symbol_map.m_tiles[2].m_symbol = 'K';
-    symbol_map.m_tiles[3].m_symbol = 'S';
+    symbol_map.m_entity_placements.push_back(DungeonMap::EntityPlacement{
+        .m_kind = DungeonMap::EntityKind::Spawn,
+        .m_col = 0,
+        .m_row = 0,
+        .m_debug_symbol = 'A',
+        .m_collision_mask = k_tile_collision_none,
+        .m_movable = true,
+    });
+    symbol_map.m_entity_placements.push_back(DungeonMap::EntityPlacement{
+        .m_kind = DungeonMap::EntityKind::Key,
+        .m_col = 2,
+        .m_row = 0,
+        .m_debug_symbol = 'K',
+        .m_collision_mask = k_tile_collision_none,
+        .m_movable = false,
+    });
+    symbol_map.m_entity_placements.push_back(DungeonMap::EntityPlacement{
+        .m_kind = DungeonMap::EntityKind::Switch,
+        .m_col = 0,
+        .m_row = 1,
+        .m_debug_symbol = 'S',
+        .m_collision_mask = k_tile_collision_none,
+        .m_movable = false,
+    });
 
     Scene symbol_scene{};
     check(build_scene_from_dungeon_map(symbol_map, symbol_scene), "scene build should succeed for symbol mesh tests");
 
-    const WorldMesh symbol_mesh = build_world_mesh(symbol_scene, symbol_map, 0.0F, 0.0F);
+    const SceneNodeId key_marker_node = find_first_scene_node_by_symbol(symbol_scene, 'K');
+    const SceneNodeId switch_marker_node = find_first_scene_node_by_symbol(symbol_scene, 'S');
+    check(key_marker_node != k_invalid_scene_node_id, "scene should emit a marker node for key symbol K");
+    check(switch_marker_node != k_invalid_scene_node_id, "scene should emit a marker node for switch symbol S");
 
-    constexpr std::size_t marker_vertices = 77U;
-    constexpr std::size_t marker_indices = 360U;
-    const std::size_t expected_symbol_vertices = expected_vertices + (3U * marker_vertices);
-    const std::size_t expected_symbol_indices = expected_indices + (3U * marker_indices);
+    const uint32_t generic_runtime_visual_flags = scene_node_category_bits(SceneNodeCategory::DynamicAttachment)
+        | scene_node_category_bits(SceneNodeCategory::Renderable)
+        | scene_node_category_bits(SceneNodeCategory::Pickable);
+    const SceneNodeId item_visual_node = add_runtime_visual_node(
+        symbol_scene,
+        'I',
+        Float3{
+            .m_x = 2.5F * k_scene_tile_world_size,
+            .m_y = 1.5F * k_scene_tile_world_size,
+            .m_z = 0.0F,
+        },
+        generic_runtime_visual_flags,
+        -1);
+    const SceneNodeId npc_visual_node = add_runtime_visual_node(
+        symbol_scene,
+        'N',
+        Float3{
+            .m_x = 1.5F * k_scene_tile_world_size,
+            .m_y = 1.5F * k_scene_tile_world_size,
+            .m_z = 0.0F,
+        },
+        generic_runtime_visual_flags,
+        -1);
+    check(item_visual_node != k_invalid_scene_node_id, "runtime should be able to add a generic item visual node");
+    check(npc_visual_node != k_invalid_scene_node_id, "runtime should be able to add a generic npc visual node");
+
+    const SceneNode* item_visual = find_scene_node(symbol_scene, item_visual_node);
+    const SceneNode* npc_visual = find_scene_node(symbol_scene, npc_visual_node);
+    check(item_visual != nullptr && item_visual->m_debug_symbol == 'I', "item runtime visual node should preserve its render symbol");
+    check(npc_visual != nullptr && npc_visual->m_debug_symbol == 'N', "npc runtime visual node should preserve its render symbol");
+
+    const SceneNodeId player_marker_node = add_runtime_marker_node(
+        symbol_scene,
+        'A',
+        Float3{
+            .m_x = 0.5F * k_scene_tile_world_size,
+            .m_y = 0.5F * k_scene_tile_world_size,
+            .m_z = 0.0F,
+        });
+    check(player_marker_node != k_invalid_scene_node_id, "runtime should be able to add a player marker scene node");
+    check(
+        update_scene_node_world_position(
+            symbol_scene,
+            player_marker_node,
+            Float3{
+                .m_x = 1.5F * k_scene_tile_world_size,
+                .m_y = 0.5F * k_scene_tile_world_size,
+                .m_z = 0.0F,
+            }),
+        "runtime should be able to move a player marker scene node");
+
+    const SceneNode* moved_player_marker = find_scene_node(symbol_scene, player_marker_node);
+    check(moved_player_marker != nullptr, "moved player marker scene node should remain addressable");
+    check(
+        moved_player_marker != nullptr
+            && moved_player_marker->m_world_position.m_x == 1.5F * k_scene_tile_world_size,
+        "player marker scene node should report updated world position after movement");
+
+    const WorldMesh symbol_mesh = build_world_mesh(symbol_scene, symbol_map, 0.0F, 0.0F, 0.0F, 0.0F);
+
+    const std::size_t expected_symbol_vertices = expected_vertices;
+    const std::size_t expected_symbol_indices = expected_indices;
     check(
         symbol_mesh.m_vertices.size() == expected_symbol_vertices,
-        "world mesh should include marker sphere vertices for A/K/S symbols");
+        "world mesh should exclude scene-driven marker vertices for A/K/S symbols");
     check(
         symbol_mesh.m_indices.size() == expected_symbol_indices,
-        "world mesh should include marker sphere indices for A/K/S symbols");
+        "world mesh should exclude scene-driven marker indices for A/K/S symbols");
 
     bool found_blue_marker = false;
     bool found_yellow_marker = false;
@@ -1134,18 +1218,334 @@ void test_world_mesh_generation_rules()
         }
     }
 
-    check(found_blue_marker, "world mesh should render a blue marker for player symbol A");
-    check(found_yellow_marker, "world mesh should render a yellow marker for key symbol K");
-    check(found_white_marker, "world mesh should render a white marker for switch symbol S");
+    check(!found_blue_marker, "world mesh should not bake a blue player marker into static geometry");
+    check(!found_yellow_marker, "world mesh should not bake a yellow key marker into static geometry");
+    check(!found_white_marker, "world mesh should not bake a white switch marker into static geometry");
     check(found_door_brown, "world mesh should render brown geometry for door symbol D");
 
-    const WorldMesh symbol_mesh_again = build_world_mesh(symbol_scene, symbol_map, 0.0F, 0.0F);
+    const WorldMesh symbol_mesh_again = build_world_mesh(symbol_scene, symbol_map, 0.0F, 0.0F, 0.0F, 0.0F);
     check(
         symbol_mesh_again.m_vertices.size() == symbol_mesh.m_vertices.size(),
         "symbol mesh build should be deterministic for vertex counts");
     check(
         symbol_mesh_again.m_indices == symbol_mesh.m_indices,
         "symbol mesh build should be deterministic for index ordering");
+}
+
+void test_wall_collision_octree_overlap_rules()
+{
+    DungeonMap map = build_test_map();
+    map.m_entity_placements.push_back(DungeonMap::EntityPlacement{
+        .m_kind = DungeonMap::EntityKind::Prop,
+        .m_col = 2,
+        .m_row = 0,
+        .m_debug_symbol = 'T',
+        .m_collision_mask = k_tile_collision_solid,
+        .m_movable = false,
+    });
+    map.m_entity_placements.push_back(DungeonMap::EntityPlacement{
+        .m_kind = DungeonMap::EntityKind::Prop,
+        .m_col = 0,
+        .m_row = 1,
+        .m_debug_symbol = 'T',
+        .m_collision_mask = k_tile_collision_solid,
+        .m_movable = true,
+    });
+
+    OccupancyGrid occupancy{};
+    check(build_occupancy_grid_from_map(map, occupancy), "wall collision tests should build occupancy with entity placements");
+    check(
+        is_tile_blocked(occupancy, 2, 0),
+        "non-movable solid entities should merge into static occupancy blocking");
+    check(
+        !is_tile_blocked(occupancy, 0, 1),
+        "movable solid entities should not merge into static occupancy blocking");
+
+    WallCollisionOctree octree{};
+    check(build_wall_collision_octree(map, octree), "wall collision octree should build for a map with walls");
+
+    Scene scene{};
+    check(build_scene_from_dungeon_map(map, scene), "scene build should succeed for wall collision tests");
+
+    const SceneNodeId marker_node = add_runtime_marker_node(
+        scene,
+        'A',
+        Float3{
+            .m_x = 0.5F * k_scene_tile_world_size,
+            .m_y = 1.5F * k_scene_tile_world_size,
+            .m_z = 0.0F,
+        });
+    check(marker_node != k_invalid_scene_node_id, "wall collision tests should create a runtime marker node");
+
+    const SceneNode* marker = find_scene_node(scene, marker_node);
+    check(marker != nullptr, "runtime marker node should be addressable for wall collision tests");
+    if (marker == nullptr)
+    {
+        return;
+    }
+
+    const Float3 blocked_world{
+        .m_x = 1.5F * k_scene_tile_world_size,
+        .m_y = 0.5F * k_scene_tile_world_size,
+        .m_z = 0.0F,
+    };
+    const Bounds3 blocked_bounds{
+        .m_min = Float3{
+            .m_x = blocked_world.m_x + marker->m_local_bounds.m_min.m_x,
+            .m_y = blocked_world.m_y + marker->m_local_bounds.m_min.m_y,
+            .m_z = blocked_world.m_z + marker->m_local_bounds.m_min.m_z,
+        },
+        .m_max = Float3{
+            .m_x = blocked_world.m_x + marker->m_local_bounds.m_max.m_x,
+            .m_y = blocked_world.m_y + marker->m_local_bounds.m_max.m_y,
+            .m_z = blocked_world.m_z + marker->m_local_bounds.m_max.m_z,
+        },
+    };
+    check(
+        wall_collision_octree_overlaps_bounds(octree, blocked_bounds),
+        "wall collision octree should report overlap for a runtime scene node moved into a wall tile");
+
+    const Float3 clear_world{
+        .m_x = 2.5F * k_scene_tile_world_size,
+        .m_y = 1.5F * k_scene_tile_world_size,
+        .m_z = 0.0F,
+    };
+    const Bounds3 clear_bounds{
+        .m_min = Float3{
+            .m_x = clear_world.m_x + marker->m_local_bounds.m_min.m_x,
+            .m_y = clear_world.m_y + marker->m_local_bounds.m_min.m_y,
+            .m_z = clear_world.m_z + marker->m_local_bounds.m_min.m_z,
+        },
+        .m_max = Float3{
+            .m_x = clear_world.m_x + marker->m_local_bounds.m_max.m_x,
+            .m_y = clear_world.m_y + marker->m_local_bounds.m_max.m_y,
+            .m_z = clear_world.m_z + marker->m_local_bounds.m_max.m_z,
+        },
+    };
+    check(
+        !wall_collision_octree_overlaps_bounds(octree, clear_bounds),
+        "wall collision octree should not report overlap for a runtime scene node inside clear floor space");
+
+    const Float3 static_entity_world{
+        .m_x = 2.5F * k_scene_tile_world_size,
+        .m_y = 0.5F * k_scene_tile_world_size,
+        .m_z = 0.0F,
+    };
+    const Bounds3 static_entity_bounds{
+        .m_min = Float3{
+            .m_x = static_entity_world.m_x + marker->m_local_bounds.m_min.m_x,
+            .m_y = static_entity_world.m_y + marker->m_local_bounds.m_min.m_y,
+            .m_z = static_entity_world.m_z + marker->m_local_bounds.m_min.m_z,
+        },
+        .m_max = Float3{
+            .m_x = static_entity_world.m_x + marker->m_local_bounds.m_max.m_x,
+            .m_y = static_entity_world.m_y + marker->m_local_bounds.m_max.m_y,
+            .m_z = static_entity_world.m_z + marker->m_local_bounds.m_max.m_z,
+        },
+    };
+    check(
+        wall_collision_octree_overlaps_bounds(octree, static_entity_bounds),
+        "non-movable solid entities should merge into static wall collision octree surfaces");
+
+    const Float3 movable_entity_world{
+        .m_x = 0.5F * k_scene_tile_world_size,
+        .m_y = 1.5F * k_scene_tile_world_size,
+        .m_z = 0.0F,
+    };
+    const Bounds3 movable_entity_bounds{
+        .m_min = Float3{
+            .m_x = movable_entity_world.m_x + marker->m_local_bounds.m_min.m_x,
+            .m_y = movable_entity_world.m_y + marker->m_local_bounds.m_min.m_y,
+            .m_z = movable_entity_world.m_z + marker->m_local_bounds.m_min.m_z,
+        },
+        .m_max = Float3{
+            .m_x = movable_entity_world.m_x + marker->m_local_bounds.m_max.m_x,
+            .m_y = movable_entity_world.m_y + marker->m_local_bounds.m_max.m_y,
+            .m_z = movable_entity_world.m_z + marker->m_local_bounds.m_max.m_z,
+        },
+    };
+    check(
+        !wall_collision_octree_overlaps_bounds(octree, movable_entity_bounds),
+        "movable solid entities should stay out of static wall collision octree surfaces");
+}
+
+void test_entity_dynamic_blocking_layer_rules()
+{
+    DungeonMap map = build_test_map();
+    map.m_entity_placements.push_back(DungeonMap::EntityPlacement{
+        .m_kind = DungeonMap::EntityKind::Prop,
+        .m_col = 2,
+        .m_row = 1,
+        .m_debug_symbol = 'T',
+        .m_collision_mask = k_tile_collision_solid,
+        .m_movable = false,
+    });
+    map.m_entity_placements.push_back(DungeonMap::EntityPlacement{
+        .m_kind = DungeonMap::EntityKind::Prop,
+        .m_col = 0,
+        .m_row = 1,
+        .m_debug_symbol = 'M',
+        .m_collision_mask = k_tile_collision_solid,
+        .m_movable = true,
+    });
+
+    Scene scene{};
+    check(build_scene_from_dungeon_map(map, scene), "entity dynamic blocking tests should build scene");
+
+    const SceneNodeId static_prop_node = find_first_scene_node_by_symbol(scene, 'T');
+    const SceneNodeId movable_prop_node = find_first_scene_node_by_symbol(scene, 'M');
+    check(static_prop_node != k_invalid_scene_node_id, "non-movable solid entity should exist as a scene visual node");
+    check(movable_prop_node != k_invalid_scene_node_id, "movable solid entity should exist as a scene visual node");
+
+    const SceneNode* static_prop = find_scene_node(scene, static_prop_node);
+    const SceneNode* movable_prop = find_scene_node(scene, movable_prop_node);
+    check(static_prop != nullptr, "non-movable solid entity node should be addressable");
+    check(movable_prop != nullptr, "movable solid entity node should be addressable");
+    if (static_prop == nullptr || movable_prop == nullptr)
+    {
+        return;
+    }
+
+    const uint32_t blocking_flag = scene_node_category_bits(SceneNodeCategory::BlocksMovement);
+    check(
+        !scene_node_has_flags(*static_prop, blocking_flag),
+        "non-movable solid entities should not be tagged as dynamic scene blockers");
+    check(
+        scene_node_has_flags(*movable_prop, blocking_flag),
+        "movable solid entities should be tagged as dynamic scene blockers");
+}
+
+void test_scene_blocking_node_rules()
+{
+    const DungeonMap map = build_test_map();
+    Scene scene{};
+    check(build_scene_from_dungeon_map(map, scene), "scene build should succeed for scene blocking tests");
+
+    const uint32_t non_blocking_visual_flags = scene_node_category_bits(SceneNodeCategory::DynamicAttachment)
+        | scene_node_category_bits(SceneNodeCategory::Renderable)
+        | scene_node_category_bits(SceneNodeCategory::Pickable);
+    const uint32_t blocking_visual_flags = non_blocking_visual_flags
+        | scene_node_category_bits(SceneNodeCategory::BlocksMovement);
+
+    const SceneNodeId player_node = add_runtime_marker_node(
+        scene,
+        'A',
+        Float3{
+            .m_x = 0.5F * k_scene_tile_world_size,
+            .m_y = 1.5F * k_scene_tile_world_size,
+            .m_z = 0.0F,
+        });
+    check(player_node != k_invalid_scene_node_id, "scene blocking tests should create a player marker node");
+
+    const SceneNodeId key_node = add_runtime_visual_node(
+        scene,
+        'K',
+        Float3{
+            .m_x = 1.5F * k_scene_tile_world_size,
+            .m_y = 1.5F * k_scene_tile_world_size,
+            .m_z = 0.0F,
+        },
+        non_blocking_visual_flags,
+        -1);
+    const SceneNodeId switch_node = add_runtime_visual_node(
+        scene,
+        'S',
+        Float3{
+            .m_x = 2.5F * k_scene_tile_world_size,
+            .m_y = 1.5F * k_scene_tile_world_size,
+            .m_z = 0.0F,
+        },
+        non_blocking_visual_flags,
+        -1);
+    const SceneNodeId statue_node = add_runtime_visual_node(
+        scene,
+        'T',
+        Float3{
+            .m_x = 2.5F * k_scene_tile_world_size,
+            .m_y = 0.5F * k_scene_tile_world_size,
+            .m_z = 0.0F,
+        },
+        blocking_visual_flags,
+        -1);
+
+    check(key_node != k_invalid_scene_node_id, "scene blocking tests should create a non-blocking key node");
+    check(switch_node != k_invalid_scene_node_id, "scene blocking tests should create a non-blocking switch node");
+    check(statue_node != k_invalid_scene_node_id, "scene blocking tests should create a blocking statue node");
+
+    const SceneNode* key = find_scene_node(scene, key_node);
+    const SceneNode* statue = find_scene_node(scene, statue_node);
+    check(key != nullptr, "scene blocking tests should find key node");
+    check(statue != nullptr, "scene blocking tests should find statue node");
+    if (key == nullptr || statue == nullptr)
+    {
+        return;
+    }
+
+    const Bounds3 key_bounds{
+        .m_min = Float3{
+            .m_x = key->m_world_position.m_x + key->m_local_bounds.m_min.m_x,
+            .m_y = key->m_world_position.m_y + key->m_local_bounds.m_min.m_y,
+            .m_z = key->m_world_position.m_z + key->m_local_bounds.m_min.m_z,
+        },
+        .m_max = Float3{
+            .m_x = key->m_world_position.m_x + key->m_local_bounds.m_max.m_x,
+            .m_y = key->m_world_position.m_y + key->m_local_bounds.m_max.m_y,
+            .m_z = key->m_world_position.m_z + key->m_local_bounds.m_max.m_z,
+        },
+    };
+    const Bounds3 statue_bounds{
+        .m_min = Float3{
+            .m_x = statue->m_world_position.m_x + statue->m_local_bounds.m_min.m_x,
+            .m_y = statue->m_world_position.m_y + statue->m_local_bounds.m_min.m_y,
+            .m_z = statue->m_world_position.m_z + statue->m_local_bounds.m_min.m_z,
+        },
+        .m_max = Float3{
+            .m_x = statue->m_world_position.m_x + statue->m_local_bounds.m_max.m_x,
+            .m_y = statue->m_world_position.m_y + statue->m_local_bounds.m_max.m_y,
+            .m_z = statue->m_world_position.m_z + statue->m_local_bounds.m_max.m_z,
+        },
+    };
+
+    const uint32_t blocking_flag = scene_node_category_bits(SceneNodeCategory::BlocksMovement);
+    check(
+        !any_scene_node_blocks_bounds(scene, key_bounds, player_node, blocking_flag),
+        "non-blocking key and switch visuals should not block movement bounds checks");
+    check(
+        any_scene_node_blocks_bounds(scene, statue_bounds, player_node, blocking_flag),
+        "blocking statue-style visuals should block movement bounds checks");
+}
+
+void test_illusory_wall_layer_rules()
+{
+    DungeonMap map = build_test_map();
+    // Convert the physical wall tile into a visual-only (illusory) wall.
+    map.m_tiles[1].m_symbol = 'W';
+    map.m_tiles[1].m_collision_mask = k_tile_collision_none;
+
+    OccupancyGrid occupancy{};
+    check(build_occupancy_grid_from_map(map, occupancy), "illusory wall test occupancy build should succeed");
+    check(!is_tile_blocked(occupancy, 1, 0), "visual-only illusory wall should not block physical movement");
+
+    WallCollisionOctree octree{};
+    check(
+        !build_wall_collision_octree(map, octree),
+        "illusory wall map should not build physical wall octree surfaces when no physical walls exist");
+
+    Scene scene{};
+    check(build_scene_from_dungeon_map(map, scene), "illusory wall scene build should succeed");
+    const WorldMesh mesh = build_world_mesh(scene, map, 0.0F, 0.0F, 0.0F, 0.0F);
+
+    bool found_raised_visual_wall = false;
+    for (const WorldVertex& v : mesh.m_vertices)
+    {
+        if (v.m_y > 0.0F)
+        {
+            found_raised_visual_wall = true;
+            break;
+        }
+    }
+
+    check(found_raised_visual_wall, "illusory wall should still contribute raised visual geometry");
 }
 
 void test_room_corridor_generation_rules()
@@ -1177,6 +1577,9 @@ void test_room_corridor_generation_rules()
     check(
         generated_a.m_prefab_placements.size() == generated_b.m_prefab_placements.size(),
         "deterministic runs should have same number of prefab placements");
+    check(
+        generated_a.m_entity_placements.size() == generated_b.m_entity_placements.size(),
+        "deterministic runs should have same number of entity placements");
 
     std::size_t floor_count = 0;
     std::size_t wall_count = 0;
@@ -1186,9 +1589,11 @@ void test_room_corridor_generation_rules()
         const DungeonTile& tb = generated_b.m_tiles[i];
 
         check(ta.m_symbol == tb.m_symbol, "deterministic runs should have identical tile symbols");
-        check(ta.m_blocks_movement == tb.m_blocks_movement, "deterministic runs should match movement blockers");
+        check(
+            ta.m_collision_mask == tb.m_collision_mask,
+            "deterministic runs should match tile collision masks");
 
-        if (ta.m_blocks_movement)
+        if (dungeon_tile_blocks_physical(ta))
         {
             ++wall_count;
         }
@@ -1224,11 +1629,39 @@ void test_room_corridor_generation_rules()
         const std::size_t switch_idx = static_cast<std::size_t>(c.m_switch_row * generated_a.m_width + c.m_switch_col);
 
         check(generated_a.m_tiles[door_idx].m_symbol == 'D', "constraint door tile should use 'D' symbol");
-        check(generated_a.m_tiles[door_idx].m_blocks_movement, "constraint door tile should block movement");
-        check(generated_a.m_tiles[key_idx].m_symbol == 'K', "constraint key tile should use 'K' symbol");
-        check(!generated_a.m_tiles[key_idx].m_blocks_movement, "constraint key tile should be walkable");
-        check(generated_a.m_tiles[switch_idx].m_symbol == 'S', "constraint switch tile should use 'S' symbol");
-        check(!generated_a.m_tiles[switch_idx].m_blocks_movement, "constraint switch tile should be walkable");
+        check(
+            dungeon_tile_blocks_physical(generated_a.m_tiles[door_idx]),
+            "constraint door tile should block movement");
+        check(generated_a.m_tiles[key_idx].m_symbol == '.', "constraint key tile should remain floor mesh tile");
+        check(
+            !dungeon_tile_blocks_physical(generated_a.m_tiles[key_idx]),
+            "constraint key tile should be walkable");
+        check(generated_a.m_tiles[switch_idx].m_symbol == '.', "constraint switch tile should remain floor mesh tile");
+        check(
+            !dungeon_tile_blocks_physical(generated_a.m_tiles[switch_idx]),
+            "constraint switch tile should be walkable");
+
+        bool found_key_entity = false;
+        bool found_switch_entity = false;
+        for (const DungeonMap::EntityPlacement& entity : generated_a.m_entity_placements)
+        {
+            if (entity.m_kind == DungeonMap::EntityKind::Key
+                && entity.m_col == c.m_key_col
+                && entity.m_row == c.m_key_row)
+            {
+                found_key_entity = true;
+            }
+
+            if (entity.m_kind == DungeonMap::EntityKind::Switch
+                && entity.m_col == c.m_switch_col
+                && entity.m_row == c.m_switch_row)
+            {
+                found_switch_entity = true;
+            }
+        }
+
+        check(found_key_entity, "constraint key placement should be represented in entity placement table");
+        check(found_switch_entity, "constraint switch placement should be represented in entity placement table");
     }
 
     if (!generated_a.m_prefab_placements.empty())
@@ -1252,31 +1685,31 @@ void test_room_corridor_generation_rules()
             && p.m_origin_row + p.m_height <= generated_a.m_height,
             "prefab placement bounds should fit within generated map");
 
-        bool found_prefab_marker = false;
-        for (int row = p.m_origin_row; row < p.m_origin_row + p.m_height; ++row)
+        bool found_prefab_entity = false;
+        for (const DungeonMap::EntityPlacement& entity : generated_a.m_entity_placements)
         {
-            for (int col = p.m_origin_col; col < p.m_origin_col + p.m_width; ++col)
+            if (entity.m_kind != DungeonMap::EntityKind::Prop)
             {
-                const std::size_t idx = static_cast<std::size_t>(row * generated_a.m_width + col);
-                if (generated_a.m_tiles[idx].m_symbol == 'P')
-                {
-                    found_prefab_marker = true;
-                    break;
-                }
+                continue;
             }
-            if (found_prefab_marker)
+
+            if (entity.m_col >= p.m_origin_col
+                && entity.m_col < (p.m_origin_col + p.m_width)
+                && entity.m_row >= p.m_origin_row
+                && entity.m_row < (p.m_origin_row + p.m_height))
             {
+                found_prefab_entity = true;
                 break;
             }
         }
-        check(found_prefab_marker, "prefab placement area should include prefab marker tiles");
+        check(found_prefab_entity, "prefab placement area should include prop entities");
     }
 
     // Baseline connectivity: all floor tiles are reachable from the first floor tile.
     int start_idx = -1;
     for (int i = 0; i < static_cast<int>(generated_a.m_tiles.size()); ++i)
     {
-        if (!generated_a.m_tiles[static_cast<std::size_t>(i)].m_blocks_movement)
+        if (!dungeon_tile_blocks_physical(generated_a.m_tiles[static_cast<std::size_t>(i)]))
         {
             start_idx = i;
             break;
@@ -1302,7 +1735,7 @@ void test_room_corridor_generation_rules()
             open.pop();
 
             const DungeonTile& tile = generated_a.m_tiles[static_cast<std::size_t>(idx)];
-            if (!tile.m_blocks_movement)
+            if (!dungeon_tile_blocks_physical(tile))
             {
                 ++reached_floor_count;
             }
@@ -1323,7 +1756,7 @@ void test_room_corridor_generation_rules()
 
                 const int nidx = nr * generated_a.m_width + nc;
                 const std::size_t nidx_u = static_cast<std::size_t>(nidx);
-                if (visited[nidx_u] != 0U || generated_a.m_tiles[nidx_u].m_blocks_movement)
+                if (visited[nidx_u] != 0U || dungeon_tile_blocks_physical(generated_a.m_tiles[nidx_u]))
                 {
                     continue;
                 }
@@ -1373,14 +1806,14 @@ void test_generated_dungeon_validation_rules()
             disconnected.m_tiles.push_back(DungeonTile{
                 .m_col = col,
                 .m_row = row,
-                .m_blocks_movement = true,
+                .m_collision_mask = k_tile_collision_solid,
                 .m_symbol = '#',
             });
         }
     }
-    disconnected.m_tiles[0].m_blocks_movement = false;
+    disconnected.m_tiles[0].m_collision_mask = k_tile_collision_none;
     disconnected.m_tiles[0].m_symbol = '.';
-    disconnected.m_tiles[24].m_blocks_movement = false;
+    disconnected.m_tiles[24].m_collision_mask = k_tile_collision_none;
     disconnected.m_tiles[24].m_symbol = '.';
 
     DungeonValidationReport disconnected_report{};
@@ -1408,6 +1841,57 @@ void test_generated_dungeon_validation_rules()
     check(!constraint_report.m_issues.empty(), "constraint validation failure should report issues");
 }
 
+void test_handcrafted_entity_table_rules()
+{
+    const std::filesystem::path temp_dir = std::filesystem::temp_directory_path();
+    const std::filesystem::path strict_map_path =
+        temp_dir / ("mordor_strict_entities_" + std::to_string(std::rand()) + ".map");
+    const std::filesystem::path legacy_map_path =
+        temp_dir / ("mordor_legacy_entities_" + std::to_string(std::rand()) + ".map");
+
+    {
+        std::ofstream strict_map(strict_map_path);
+        strict_map << "#####\n";
+        strict_map << "#...#\n";
+        strict_map << "#####\n";
+        strict_map << "@entity key 1 1 K 0 0\n";
+        strict_map << "@entity prop 2 1 T 1 0\n";
+    }
+
+    {
+        std::ofstream legacy_map(legacy_map_path);
+        legacy_map << "#####\n";
+        legacy_map << "#K..#\n";
+        legacy_map << "#####\n";
+    }
+
+    DungeonMap strict_loaded{};
+    check(
+        load_handcrafted_dungeon_map(strict_map_path.string(), strict_loaded),
+        "strict handcrafted map with entity table should load");
+    check(
+        strict_loaded.m_entity_placements.size() == 2U,
+        "strict handcrafted entity table should produce expected placement count");
+
+    if (strict_loaded.m_entity_placements.size() >= 2U)
+    {
+        check(
+            !dungeon_entity_blocks_physical(strict_loaded.m_entity_placements[0]),
+            "non-solid entity table entries should remain non-blocking");
+        check(
+            dungeon_entity_blocks_physical(strict_loaded.m_entity_placements[1]),
+            "solid entity table entries should set physical blocking bit");
+    }
+
+    DungeonMap legacy_loaded{};
+    check(
+        !load_handcrafted_dungeon_map(legacy_map_path.string(), legacy_loaded),
+        "legacy entity tile symbols should be rejected in strict table mode");
+
+    std::filesystem::remove(strict_map_path);
+    std::filesystem::remove(legacy_map_path);
+}
+
 } // namespace
 
 int main()
@@ -1426,8 +1910,13 @@ int main()
         test_inventory_pipeline_rules();
         test_hud_surface_rules();
         test_world_mesh_generation_rules();
+        test_wall_collision_octree_overlap_rules();
+        test_entity_dynamic_blocking_layer_rules();
+        test_scene_blocking_node_rules();
+        test_illusory_wall_layer_rules();
         test_room_corridor_generation_rules();
         test_generated_dungeon_validation_rules();
+        test_handcrafted_entity_table_rules();
     }
     catch (const std::exception& ex)
     {

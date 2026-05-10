@@ -6,19 +6,44 @@
 
 namespace mordor {
 
+constexpr uint32_t k_tile_collision_none = 0U;
+constexpr uint32_t k_tile_collision_solid = 1U << 0;
+
 struct DungeonTile
 {
     int m_col{0};
     int m_row{0};
-    bool m_blocks_movement{false};
+    uint32_t m_collision_mask{k_tile_collision_none};
     char m_symbol{'.'};
 };
 
 struct DungeonMap
 {
+    enum class EntityKind : uint8_t
+    {
+        Unknown = 0,
+        Key,
+        Switch,
+        Prop,
+        Item,
+        Npc,
+        Spawn,
+    };
+
+    struct EntityPlacement
+    {
+        EntityKind m_kind{EntityKind::Unknown};
+        int m_col{0};
+        int m_row{0};
+        char m_debug_symbol{'?'};
+        uint32_t m_collision_mask{k_tile_collision_none};
+        bool m_movable{false};
+    };
+
     int m_width{0};
     int m_height{0};
     std::vector<DungeonTile> m_tiles{};
+    std::vector<EntityPlacement> m_entity_placements{};
     struct DoorConstraint
     {
         uint32_t m_key_id{0U};
@@ -69,5 +94,10 @@ struct DungeonValidationReport
 bool load_handcrafted_dungeon_map(const std::string& path, DungeonMap& out_map);
 bool generate_room_corridor_dungeon_map(const DungeonGenerationConfig& config, DungeonMap& out_map);
 bool validate_generated_dungeon_map(const DungeonMap& map, DungeonValidationReport& out_report);
+bool dungeon_tile_has_collision_bits(const DungeonTile& tile, uint32_t bits);
+bool dungeon_tile_blocks_physical(const DungeonTile& tile);
+bool dungeon_tile_blocks_visual(const DungeonTile& tile);
+bool dungeon_entity_has_collision_bits(const DungeonMap::EntityPlacement& entity, uint32_t bits);
+bool dungeon_entity_blocks_physical(const DungeonMap::EntityPlacement& entity);
 
 } // namespace mordor

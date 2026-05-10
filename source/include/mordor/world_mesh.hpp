@@ -28,15 +28,45 @@ struct WorldVertex
 struct WorldMesh
 {
     std::vector<WorldVertex> m_vertices{};
-    std::vector<uint32_t>   m_indices{};
+    std::vector<uint32_t> m_indices{}; // Combined index stream for diagnostics/tests.
+    std::vector<uint32_t> m_opaque_indices{}; // Floors, markers, and any always-opaque geometry.
+    std::vector<uint32_t> m_transparent_indices{}; // Wall surfaces rendered in occlusion-aware passes.
+};
+
+struct WallSurfaceBounds
+{
+    Bounds3 m_bounds{};
+};
+
+struct WallCollisionOctreeNode
+{
+    Bounds3 m_bounds{};
+    std::vector<int> m_surface_indices{};
+    std::vector<int> m_children{}; // Child node indices in octree array.
+};
+
+struct WallCollisionOctree
+{
+    std::vector<WallSurfaceBounds> m_surfaces{};
+    std::vector<WallCollisionOctreeNode> m_nodes{};
 };
 
 /// Build floor and wall geometry from scene node world bounds and map tile data.
 /// Floor tiles emit a flat quad at Y = 0.
 /// Wall tiles emit a box (top face + four side faces) from Y = 0 to Y = k_wall_height.
-/// Wall alpha is calculated to fade walls near the camera for interaction readability.
+/// Wall alpha is calculated in an actor-centric camera-to-anchor corridor for interaction readability.
 /// Tiles are emitted in ascending payload-index (row-major) order for deterministic output.
-/// camera_x, camera_z: Position of the camera/observer in world space for occlusion fade.
-WorldMesh build_world_mesh(const Scene& scene, const DungeonMap& map, float camera_x, float camera_z);
+/// camera_x, camera_z: Camera/world observer position in world space.
+/// anchor_x, anchor_z: Active actor/party anchor position in world space.
+WorldMesh build_world_mesh(
+    const Scene& scene,
+    const DungeonMap& map,
+    float camera_x,
+    float camera_z,
+    float anchor_x,
+    float anchor_z);
+
+bool build_wall_collision_octree(const DungeonMap& map, WallCollisionOctree& out_octree);
+bool wall_collision_octree_overlaps_bounds(const WallCollisionOctree& octree, const Bounds3& bounds);
 
 } // namespace mordor

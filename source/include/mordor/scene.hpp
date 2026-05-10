@@ -24,6 +24,7 @@ enum class SceneNodeCategory : uint32_t
     DebugOnly = 1U << 4U,
     Renderable = 1U << 5U,
     Pickable = 1U << 6U,
+    BlocksMovement = 1U << 7U,
 };
 
 constexpr uint32_t scene_node_category_bits(SceneNodeCategory category)
@@ -55,6 +56,7 @@ struct SceneNode
     Bounds3 m_world_bounds{};
     uint32_t m_category_flags{scene_node_category_bits(SceneNodeCategory::None)};
     int m_payload_index{-1};
+    char m_debug_symbol{'\0'};
 };
 
 struct SceneOctreeCell
@@ -93,8 +95,22 @@ struct SceneDebugMetrics
 };
 
 bool build_scene_from_dungeon_map(const DungeonMap& map, Scene& out_scene);
+SceneNodeId add_runtime_visual_node(
+    Scene& scene,
+    char symbol,
+    const Float3& world_position,
+    uint32_t category_flags,
+    int payload_index);
+SceneNodeId add_runtime_marker_node(Scene& scene, char symbol, const Float3& world_position);
+bool update_scene_node_world_position(Scene& scene, SceneNodeId node_id, const Float3& world_position);
 const SceneNode* find_scene_node(const Scene& scene, SceneNodeId node_id);
+SceneNodeId find_first_scene_node_by_symbol(const Scene& scene, char symbol);
 std::vector<SceneNodeId> query_scene_bounds(const Scene& scene, const Bounds3& bounds);
+bool any_scene_node_blocks_bounds(
+    const Scene& scene,
+    const Bounds3& bounds,
+    SceneNodeId ignored_node_id,
+    uint32_t blocking_flags);
 std::vector<SceneNodeId> query_scene_point(
     const Scene& scene,
     const Float3& world_point,

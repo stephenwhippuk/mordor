@@ -66,7 +66,23 @@ bool build_occupancy_grid_from_map(const DungeonMap& map, OccupancyGrid& out_gri
         }
 
         const std::size_t idx = tile_index(grid, tile.m_col, tile.m_row);
-        grid.m_static_blocking[idx] = tile.m_blocks_movement ? 1U : 0U;
+        grid.m_static_blocking[idx] = dungeon_tile_blocks_physical(tile) ? 1U : 0U;
+    }
+
+    for (const DungeonMap::EntityPlacement& entity : map.m_entity_placements)
+    {
+        if (!dungeon_entity_blocks_physical(entity) || entity.m_movable)
+        {
+            continue;
+        }
+
+        if (entity.m_col < 0 || entity.m_col >= grid.m_width || entity.m_row < 0 || entity.m_row >= grid.m_height)
+        {
+            continue;
+        }
+
+        const std::size_t idx = tile_index(grid, entity.m_col, entity.m_row);
+        grid.m_static_blocking[idx] = 1U;
     }
 
     out_grid = std::move(grid);

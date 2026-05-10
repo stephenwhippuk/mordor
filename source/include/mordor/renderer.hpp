@@ -83,6 +83,8 @@ public:
 
     bool should_close() const;
     void update_camera_controls(double dt_seconds);
+    bool is_input_action_active(InputAction action) const;
+    void set_occlusion_target_world(float world_x, float world_y);
     CameraState camera_state() const;
     FramebufferSize framebuffer_size() const;
     void mouse_position(int& out_x, int& out_y) const;  // Current cursor position in screen space
@@ -111,10 +113,17 @@ private:
     // World geometry GPU resources (0 = unloaded).
     uint32_t m_world_shader{0U};
     int      m_mvp_uniform{-1};
+    int      m_occlusion_pass_uniform{-1};
+    int      m_camera_world_uniform{-1};
+    int      m_target_world_uniform{-1};
     uint32_t m_world_vao{0U};
     uint32_t m_world_vbo{0U};
-    uint32_t m_world_ibo{0U};
-    int      m_world_index_count{0};
+    uint32_t m_world_ibo_opaque{0U};
+    uint32_t m_world_ibo_transparent{0U};
+    int      m_world_opaque_index_count{0};
+    int      m_world_transparent_index_count{0};
+    float    m_occlusion_target_x{0.0F};
+    float    m_occlusion_target_y{0.0F};
 
     // Render metrics and frustum culling (P5-05).
     RenderMetrics m_render_metrics{};

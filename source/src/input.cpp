@@ -9,16 +9,20 @@ namespace mordor {
 InputBindings::InputBindings()
 {
 #if MORDOR_HAS_GLFW
-    set_bindings(InputAction::PanLeft, {GLFW_KEY_A, GLFW_KEY_LEFT});
-    set_bindings(InputAction::PanRight, {GLFW_KEY_D, GLFW_KEY_RIGHT});
-    set_bindings(InputAction::PanUp, {GLFW_KEY_W, GLFW_KEY_UP});
-    set_bindings(InputAction::PanDown, {GLFW_KEY_S, GLFW_KEY_DOWN});
+    set_bindings(InputAction::PanLeft, {GLFW_KEY_A});
+    set_bindings(InputAction::PanRight, {GLFW_KEY_D});
+    set_bindings(InputAction::PanUp, {GLFW_KEY_W});
+    set_bindings(InputAction::PanDown, {GLFW_KEY_S});
     set_bindings(InputAction::RotateLeft, {GLFW_KEY_Q});
     set_bindings(InputAction::RotateRight, {GLFW_KEY_E});
     set_bindings(InputAction::ZoomIn, {GLFW_KEY_R});
     set_bindings(InputAction::ZoomOut, {GLFW_KEY_F});
     set_bindings(InputAction::PitchUp, {GLFW_KEY_T});
     set_bindings(InputAction::PitchDown, {GLFW_KEY_G});
+    set_bindings(InputAction::MovePlayerLeft, {GLFW_KEY_LEFT});
+    set_bindings(InputAction::MovePlayerRight, {GLFW_KEY_RIGHT});
+    set_bindings(InputAction::MovePlayerUp, {GLFW_KEY_UP});
+    set_bindings(InputAction::MovePlayerDown, {GLFW_KEY_DOWN});
 #else
     set_bindings(InputAction::PanLeft, {});
     set_bindings(InputAction::PanRight, {});
@@ -30,6 +34,10 @@ InputBindings::InputBindings()
     set_bindings(InputAction::ZoomOut, {});
     set_bindings(InputAction::PitchUp, {});
     set_bindings(InputAction::PitchDown, {});
+    set_bindings(InputAction::MovePlayerLeft, {});
+    set_bindings(InputAction::MovePlayerRight, {});
+    set_bindings(InputAction::MovePlayerUp, {});
+    set_bindings(InputAction::MovePlayerDown, {});
 #endif
 }
 
