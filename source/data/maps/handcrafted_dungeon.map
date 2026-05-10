@@ -2,6 +2,8 @@
 ; # wall (blocking)
 ; . floor (walkable)
 ; D door (blocking for now)
+; Non-mesh entities must be authored with explicit records:
+; @entity <kind> <col> <row> <symbol> <solid> <movable>
 
 ######################
 #........#...........#
@@ -16,3 +18,9 @@
 #.#...#.#####.####...#
 #.#####..............#
 ######################
+
+; Example non-mesh entity placements
+@entity spawn 1 1 A 0 1
+@entity key 3 1 K 0 0
+@entity switch 16 9 S 0 0
+@entity prop 11 5 T 1 0

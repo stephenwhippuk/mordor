@@ -119,7 +119,7 @@ std::vector<mordor::DebugTile> build_debug_tiles_from_scene(
             continue;
         }
 
-        const bool blocked = tile->m_blocks_movement;
+        const bool blocked = mordor::dungeon_tile_blocks_physical(*tile);
         const float r = blocked ? 0.62F : 0.18F;
         const float g = blocked ? 0.20F : 0.43F;
         const float b = blocked ? 0.20F : 0.24F;
@@ -273,7 +273,7 @@ bool mark_player_spawn_tile(mordor::DungeonMap& map, int& out_col, int& out_row)
 {
     for (mordor::DungeonTile& tile : map.m_tiles)
     {
-        if (!tile.m_blocks_movement && tile.m_symbol == '.')
+        if (!mordor::dungeon_tile_blocks_physical(tile) && tile.m_symbol == '.')
         {
             out_col = tile.m_col;
             out_row = tile.m_row;
@@ -283,7 +283,7 @@ bool mark_player_spawn_tile(mordor::DungeonMap& map, int& out_col, int& out_row)
 
     for (mordor::DungeonTile& tile : map.m_tiles)
     {
-        if (!tile.m_blocks_movement)
+        if (!mordor::dungeon_tile_blocks_physical(tile))
         {
             out_col = tile.m_col;
             out_row = tile.m_row;

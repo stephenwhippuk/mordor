@@ -242,7 +242,7 @@ WallMaterial wall_material_at(const DungeonMap& map, int col, int row)
     }
 
     const std::size_t idx = tile_index_for(map.m_width, col, row);
-    if (idx >= map.m_tiles.size() || !map.m_tiles[idx].m_blocks_movement)
+    if (idx >= map.m_tiles.size() || !dungeon_tile_blocks_visual(map.m_tiles[idx]))
     {
         return WallMaterial::None;
     }
@@ -500,7 +500,7 @@ WorldMesh build_world_mesh(
             .m_z0 = node.m_world_bounds.m_min.m_y,
             .m_x1 = node.m_world_bounds.m_max.m_x,
             .m_z1 = node.m_world_bounds.m_max.m_y,
-            .m_is_wall  = tile.m_blocks_movement,
+            .m_is_wall  = dungeon_tile_blocks_visual(tile),
             .m_symbol = tile.m_symbol,
             .m_sort_key = node.m_payload_index,
         });
@@ -658,12 +658,28 @@ bool build_wall_collision_octree(const DungeonMap& map, WallCollisionOctree& out
 
     for (const DungeonTile& tile : map.m_tiles)
     {
-        if (!tile.m_blocks_movement || tile.m_col < 0 || tile.m_row < 0
+        if (!dungeon_tile_blocks_physical(tile) || tile.m_col < 0 || tile.m_row < 0
             || tile.m_col >= width || tile.m_row >= height)
         {
             continue;
         }
         const std::size_t idx = static_cast<std::size_t>((tile.m_row * width) + tile.m_col);
+        if (idx < blocked.size())
+        {
+            blocked[idx] = 1U;
+        }
+    }
+
+    for (const DungeonMap::EntityPlacement& entity : map.m_entity_placements)
+    {
+        if (!dungeon_entity_blocks_physical(entity) || entity.m_movable
+            || entity.m_col < 0 || entity.m_row < 0
+            || entity.m_col >= width || entity.m_row >= height)
+        {
+            continue;
+        }
+
+        const std::size_t idx = static_cast<std::size_t>((entity.m_row * width) + entity.m_col);
         if (idx < blocked.size())
         {
             blocked[idx] = 1U;

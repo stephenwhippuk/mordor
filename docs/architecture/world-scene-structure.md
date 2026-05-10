@@ -31,6 +31,26 @@ It is loaded into three runtime products:
 2. Simulation cell data used for blocking, occupancy, and rule queries.
 3. Scene-node definitions used to construct runtime scene state.
 
+Authoring contract:
+1. The tile grid defines mesh/collision only (visual symbols plus collision bitmask data).
+2. Non-mesh entities (keys, switches, props, items, NPC markers, spawn anchors) are authored in a separate map-associated entity-placement table.
+3. Entity placements carry explicit collision bits (`solid` currently) plus a `movable` flag.
+4. Non-movable solid entity placements merge into static occupancy and wall-collision build data; movable solid entities remain dynamic blockers.
+5. Handcrafted map loading uses strict table-based non-mesh entity authoring (`@entity ...` records) and does not accept legacy entity tile symbols.
+
+Handcrafted entity record format:
+1. Record syntax: `@entity <kind> <col> <row> <symbol> <solid> <movable>`
+2. `<kind>` values: `key`, `switch`, `prop`, `item`, `npc`, `spawn`
+3. `<solid>` values: `0|1` or `false|true`
+4. `<movable>` values: `0|1` or `false|true`
+5. `col,row` are zero-based tile coordinates and must be in bounds on a non-blocking tile.
+6. Duplicate records at the same `(kind,col,row)` are rejected.
+
+Examples:
+1. `@entity key 4 7 K 0 0`
+2. `@entity prop 12 5 T 1 0`
+3. `@entity spawn 2 2 A 0 1`
+
 ### 2) Scene Graph
 Use a scene graph with stable `scene_node_id` handles.
 
@@ -68,10 +88,11 @@ Why this is the baseline:
 3. Keeps clipping, picking, overlap probes, and nearby-node discovery on the same broadphase primitive.
 
 Operational rules:
-1. Static nodes are inserted once during map load.
-2. Dynamic nodes are reinserted only when their world bounds move outside the current loose-octree tolerance.
+1. Static map nodes are built at map load and inserted into the scene index during scene construction.
+2. Runtime visual node add/move operations currently trigger a full scene-index rebuild to preserve deterministic behavior.
 3. Octree leaves store compact node-handle lists rather than duplicating payload data.
-4. Broadphase results always require a narrower follow-up check against bounds, cell occupancy, or specific gameplay rules.
+4. Broadphase query results always require a narrower follow-up check against bounds, cell occupancy, or specific gameplay rules.
+5. Incremental reinsertion based on loose-octree tolerance remains a planned optimization, not the current runtime path.
 
 ### 4) Simulation Spatial Data
 Do not use the octree as the authoritative gameplay blocking model.
@@ -103,19 +124,19 @@ This split avoids forcing gameplay rules to depend on renderer-oriented hierarch
 3. Resolve ambiguous hits through gameplay rules rather than scene-graph ordering.
 
 ## Update Model
-1. Node transforms and bounds propagate from parent to child through explicit dirty flags.
-2. Static-world rebuild happens on map load only.
+1. Node transforms and bounds propagate from parent to child via recursive world-bounds updates on mutation.
+2. Static-world scene construction happens at map load; runtime visual node mutations currently rebuild the scene index for correctness.
 3. Dynamic actor and interactable attachments publish transform changes through simulation-owned systems.
 4. Picking and culling read from the latest committed scene state for the frame.
 5. Static mesh collision uses an acceleration structure derived from merged wall surfaces, while dynamic scene nodes update their own bounds independently.
-6. Runtime visual nodes should be generic enough to cover follow-on items, NPCs, and temporary gameplay markers without requiring new static-mesh geometry paths.
+6. Runtime visual nodes are generic enough to cover follow-on items, NPCs, and temporary gameplay markers without requiring new static-mesh geometry paths.
 
 ## Phase 2 Contracts
 Phase 2 systems should build against these contracts:
 1. Actors and interactables reference `scene_node_id` when they need a world attachment point.
 2. Blocking, occupancy, and rule evaluation reference simulation spatial records, not scene-graph parentage.
 3. Renderer-facing clipping and picking services consume scene bounds from the octree-backed scene state.
-4. Map loading must emit both simulation cell data and scene-node construction data from the same authored asset.
+4. Map loading must emit both simulation cell data and entity-placement-driven scene-node construction data from the same authored asset.
 
 ## Deferred Details
 These are intentionally left for later implementation work:

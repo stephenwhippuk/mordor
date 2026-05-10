@@ -177,6 +177,11 @@ int ensure_child_cell(SceneSpatialIndex& index, int parent_cell_index, int octan
 void insert_scene_node(Scene& scene, int cell_index, SceneNodeId node_id)
 {
     SceneSpatialIndex& index = scene.m_spatial_index;
+    if (cell_index < 0 || static_cast<std::size_t>(cell_index) >= index.m_cells.size())
+    {
+        return;
+    }
+
     SceneOctreeCell& cell = index.m_cells[static_cast<std::size_t>(cell_index)];
     const SceneNode* node = find_scene_node(scene, node_id);
     if (node == nullptr)
@@ -274,6 +279,16 @@ uint32_t marker_flags_for_symbol(char symbol)
 
     return renderable_pickable
         | scene_node_category_bits(SceneNodeCategory::DynamicAttachment);
+}
+
+uint32_t marker_flags_for_entity(const DungeonMap::EntityPlacement& entity)
+{
+    uint32_t flags = marker_flags_for_symbol(entity.m_debug_symbol);
+    if (dungeon_entity_blocks_physical(entity) && entity.m_movable)
+    {
+        flags |= scene_node_category_bits(SceneNodeCategory::BlocksMovement);
+    }
+    return flags;
 }
 
 void update_scene_node_bounds_recursive(Scene& scene, SceneNodeId node_id)
@@ -443,23 +458,29 @@ bool build_scene_from_dungeon_map(const DungeonMap& map, Scene& out_scene)
             return false;
         }
 
-        if (tile.m_symbol == 'K' || tile.m_symbol == 'S')
+    }
+
+    for (const DungeonMap::EntityPlacement& entity : map.m_entity_placements)
+    {
+        if (entity.m_kind == DungeonMap::EntityKind::Unknown)
         {
-            const Float3 marker_position{
-                .m_x = (static_cast<float>(tile.m_col) + 0.5F) * k_scene_tile_world_size,
-                .m_y = (static_cast<float>(tile.m_row) + 0.5F) * k_scene_tile_world_size,
-                .m_z = 0.0F,
-            };
-            if (add_runtime_visual_node(
-                    scene,
-                    tile.m_symbol,
-                    marker_position,
-                    marker_flags_for_symbol(tile.m_symbol),
-                    static_cast<int>(tile_index))
-                == k_invalid_scene_node_id)
-            {
-                return false;
-            }
+            continue;
+        }
+
+        const Float3 marker_position{
+            .m_x = (static_cast<float>(entity.m_col) + 0.5F) * k_scene_tile_world_size,
+            .m_y = (static_cast<float>(entity.m_row) + 0.5F) * k_scene_tile_world_size,
+            .m_z = 0.0F,
+        };
+        if (add_runtime_visual_node(
+                scene,
+                entity.m_debug_symbol,
+                marker_position,
+                marker_flags_for_entity(entity),
+                -1)
+            == k_invalid_scene_node_id)
+        {
+            return false;
         }
     }
 
@@ -587,6 +608,10 @@ std::vector<SceneNodeId> query_scene_bounds(const Scene& scene, const Bounds3& b
     {
         const int cell_index = pending_cells.back();
         pending_cells.pop_back();
+        if (cell_index < 0 || static_cast<std::size_t>(cell_index) >= scene.m_spatial_index.m_cells.size())
+        {
+            continue;
+        }
 
         const SceneOctreeCell& cell = scene.m_spatial_index.m_cells[static_cast<std::size_t>(cell_index)];
         if (!bounds_intersect(cell.m_query_bounds, bounds))
@@ -671,6 +696,10 @@ std::vector<SceneNodeId> query_scene_point(
     {
         const int cell_index = pending_cells.back();
         pending_cells.pop_back();
+        if (cell_index < 0 || static_cast<std::size_t>(cell_index) >= scene.m_spatial_index.m_cells.size())
+        {
+            continue;
+        }
 
         const SceneOctreeCell& cell = scene.m_spatial_index.m_cells[static_cast<std::size_t>(cell_index)];
         if (!point_in_bounds(world_point, cell.m_query_bounds))

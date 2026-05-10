@@ -17,8 +17,13 @@ Adopt option 3.
 The runtime model now treats visibility and movement as separate concerns:
 1. Visual-occlusion layer controls what is rendered and what can occlude line of sight/readability.
 2. Physical-blocking layer controls whether movement/collision is blocked.
-3. Dynamic scene nodes are non-blocking by default unless they explicitly opt into `BlocksMovement`.
-4. Wall/octree static geometry remains physical-blocking unless an explicit gameplay rule marks a visual-only exception (for example, an illusory wall).
+3. Map physical blocking is authored as a collision bitmask layer (`solid` bit currently), independent of visual symbol placement.
+4. Dynamic scene nodes are non-blocking by default unless they explicitly opt into `BlocksMovement`.
+5. Wall/octree static geometry remains physical-blocking unless an explicit gameplay rule marks a visual-only exception (for example, an illusory wall).
+6. Baseline authored support now includes visual-only wall tiles (`W`) that render as wall occluders while remaining non-blocking for occupancy and physical wall-octree collision.
+7. Map-authored non-mesh entities are represented in a dedicated entity placement table rather than tile symbol codes; runtime visual scene nodes are spawned from that table.
+8. Entity placements carry explicit `solid` and `movable` semantics: non-movable solids merge into static collision/occupancy data, while movable solids stay in dynamic collision paths.
+9. Handcrafted content now uses strict entity-table records for non-mesh entities and does not normalize legacy entity tile symbols from map rows.
 
 ## Consequences
 1. Positive: Keys, floor switches, and similar interactables can remain visible and interactable without preventing traversal.
@@ -28,6 +33,7 @@ The runtime model now treats visibility and movement as separate concerns:
 5. Operational impact: Movement, occlusion, and interaction pipelines must keep layer semantics aligned in tests and documentation.
 
 ## Follow-Up Actions
-1. Add explicit data fields in map/entity schemas to author visual-only versus physically blocking geometry.
-2. Extend visibility helpers to support visual-only occluders and configurable occlusion participation.
-3. Add acceptance tests for illusory walls and mixed blocking/non-blocking interactables in the same tile neighborhood.
+1. Extend explicit visual-only versus physically blocking authoring fields from map tiles into entity/interactable schemas.
+2. Extend visibility helpers to support configurable occlusion participation by layer and symbol.
+3. Merge non-movable solid scene nodes into static collision data generation, while keeping movable nodes in dynamic collision paths.
+4. Add expanded acceptance tests for mixed illusory walls, blocking props, and non-blocking interactables in the same tile neighborhood.

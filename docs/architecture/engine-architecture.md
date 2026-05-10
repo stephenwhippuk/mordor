@@ -74,6 +74,10 @@ Current baseline:
 18. Player movement now performs dynamic scene-node versus static-mesh collision checks through the wall-surface octree before committing scene-node transform updates.
 19. Dynamic visual nodes are non-blocking by default and only block movement when explicitly flagged as movement blockers.
 20. A wall-surface collision octree is built at runtime bootstrap from merged wall regions to establish spatial acceleration for collision and future occlusion/item-visibility queries.
+21. Map tiles now carry visual placement symbols and a separate physical collision bitmask layer (`solid` bit currently); visual-only walls (symbol `W`) are rendered as occluders while using an empty collision mask.
+22. Non-mesh entities are now represented in a map-associated entity placement table instead of tile symbol codes; scene runtime markers are emitted from that table.
+23. Entity placements now encode `solid` and `movable` semantics: non-movable solid entities merge into static occupancy/wall-collision data, while movable solid entities remain dynamic scene blockers.
+24. Handcrafted map loading enforces strict entity-table authoring for non-mesh entities and rejects legacy in-grid entity symbols.
 
 Ordering note:
 1. Ship stable world rendering before advanced visual effects.
@@ -101,15 +105,16 @@ Current baseline:
 3. Actor occupancy is tracked separately from blocking and can be queried per tile.
 4. Runtime movement now uses scene-node bounds against the wall octree as the static-mesh collision check, with occupancy remaining the coarse gameplay walkability layer.
 5. Visibility and collision are treated as separate layers: an entity can be visible/interactable without being movement-blocking.
-6. Baseline line-of-sight and occlusion queries are implemented over simulation-owned occupancy state, including blocked-target and blocked-corner handling.
-7. Deterministic visibility unit tests now cover clear, blocked, blocked-target, and blocked-corner LOS cases.
-8. Directional hearing primitives evaluate audibility from source/listener tiles with deterministic distance falloff, facing bias, and occupancy-based occlusion attenuation.
-9. Fog-of-war state now tracks visible versus explored cells and refreshes visibility from observer tiles using LOS-gated simulation queries.
-10. Perception debug-tile builders produce deterministic overlay payloads that map LOS, hearing, and fog results into renderer-consumable debug geometry.
-11. Deterministic room/corridor generation baseline is implemented in the map layer: non-overlapping rectangular rooms are carved into wall-filled maps and connected with L-shaped corridors using seed-driven random generation.
-12. Generator constraints baseline now places deterministic key/switch/door triplets: locked doors are embedded on generated traversal routes with paired key and switch placements emitted as map metadata for follow-on gameplay binding.
-13. Prefab insertion baseline is implemented as deterministic set-piece stamping over carved rooms, with placement metadata emitted for authored scene binding and follow-on runtime integration.
-14. Generation validation baseline verifies reachability/solvability with actionable diagnostics: walkable connectivity is checked with and without door unlock assumptions, and generated key/switch/door constraints are structurally validated before maps are considered valid.
+6. Illusory walls are represented as visual-layer wall symbols with no `solid` collision bit and are excluded from physical occupancy and wall-octree collision surfaces.
+7. Baseline line-of-sight and occlusion queries are implemented over simulation-owned occupancy state, including blocked-target and blocked-corner handling.
+8. Deterministic visibility unit tests now cover clear, blocked, blocked-target, and blocked-corner LOS cases.
+9. Directional hearing primitives evaluate audibility from source/listener tiles with deterministic distance falloff, facing bias, and occupancy-based occlusion attenuation.
+10. Fog-of-war state now tracks visible versus explored cells and refreshes visibility from observer tiles using LOS-gated simulation queries.
+11. Perception debug-tile builders produce deterministic overlay payloads that map LOS, hearing, and fog results into renderer-consumable debug geometry.
+12. Deterministic room/corridor generation baseline is implemented in the map layer: non-overlapping rectangular rooms are carved into wall-filled maps and connected with L-shaped corridors using seed-driven random generation.
+13. Generator constraints baseline now places deterministic key/switch/door triplets: locked doors are embedded on generated traversal routes with paired key and switch placements emitted as map metadata for follow-on gameplay binding.
+14. Prefab insertion baseline is implemented as deterministic set-piece stamping over carved rooms, with placement metadata emitted for authored scene binding and follow-on runtime integration.
+15. Generation validation baseline verifies reachability/solvability with actionable diagnostics: walkable connectivity is checked with and without door unlock assumptions, and generated key/switch/door constraints are structurally validated before maps are considered valid.
 
 Ordering note:
 1. Deterministic behavior is a hard requirement for reliable testing.

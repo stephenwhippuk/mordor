@@ -4,6 +4,7 @@
 #include <fstream>
 #include <queue>
 #include <random>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -14,12 +15,115 @@ namespace {
 
 bool is_supported_tile(char symbol)
 {
-    return symbol == '#' || symbol == '.' || symbol == 'D' || symbol == 'K' || symbol == 'S' || symbol == 'P';
+    return symbol == '#' || symbol == '.' || symbol == 'D' || symbol == 'W';
 }
 
-bool tile_blocks_movement(char symbol)
+DungeonMap::EntityKind entity_kind_for_token(const std::string& token)
+{
+    if (token == "key")
+    {
+        return DungeonMap::EntityKind::Key;
+    }
+    if (token == "switch")
+    {
+        return DungeonMap::EntityKind::Switch;
+    }
+    if (token == "prop")
+    {
+        return DungeonMap::EntityKind::Prop;
+    }
+    if (token == "item")
+    {
+        return DungeonMap::EntityKind::Item;
+    }
+    if (token == "npc")
+    {
+        return DungeonMap::EntityKind::Npc;
+    }
+    if (token == "spawn")
+    {
+        return DungeonMap::EntityKind::Spawn;
+    }
+
+    return DungeonMap::EntityKind::Unknown;
+}
+
+bool parse_bool_token(const std::string& token, bool& out_value)
+{
+    if (token == "1" || token == "true")
+    {
+        out_value = true;
+        return true;
+    }
+
+    if (token == "0" || token == "false")
+    {
+        out_value = false;
+        return true;
+    }
+
+    return false;
+}
+
+bool parse_entity_record_line(
+    const std::string& line,
+    DungeonMap::EntityPlacement& out_entity)
+{
+    std::istringstream record(line);
+    std::string marker{};
+    std::string kind_token{};
+    int col = 0;
+    int row = 0;
+    std::string symbol_token{};
+    std::string solid_token{};
+    std::string movable_token{};
+    if (!(record >> marker >> kind_token >> col >> row >> symbol_token >> solid_token >> movable_token))
+    {
+        return false;
+    }
+
+    if (marker != "@entity" || symbol_token.size() != 1)
+    {
+        return false;
+    }
+
+    const DungeonMap::EntityKind kind = entity_kind_for_token(kind_token);
+    if (kind == DungeonMap::EntityKind::Unknown)
+    {
+        return false;
+    }
+
+    bool is_solid = false;
+    bool is_movable = false;
+    if (!parse_bool_token(solid_token, is_solid) || !parse_bool_token(movable_token, is_movable))
+    {
+        return false;
+    }
+
+    out_entity = DungeonMap::EntityPlacement{
+        .m_kind = kind,
+        .m_col = col,
+        .m_row = row,
+        .m_debug_symbol = symbol_token[0],
+        .m_collision_mask = is_solid ? k_tile_collision_solid : k_tile_collision_none,
+        .m_movable = is_movable,
+    };
+    return true;
+}
+
+bool tile_blocks_physical_symbol(char symbol)
 {
     return symbol == '#' || symbol == 'D';
+}
+
+uint32_t tile_collision_mask_for_symbol(char symbol)
+{
+    return tile_blocks_physical_symbol(symbol) ? k_tile_collision_solid : k_tile_collision_none;
+}
+
+bool tile_blocks_visual_symbol(char symbol)
+{
+    return symbol == '#' || symbol == 'D' || symbol == 'W';
 }
 
 std::size_t tile_index(const DungeonMap& map, int col, int row)
@@ -38,7 +142,7 @@ bool tile_is_walkable(const DungeonMap& map, int col, int row)
     {
         return false;
     }
-    return !map.m_tiles[tile_index(map, col, row)].m_blocks_movement;
+    return !dungeon_tile_blocks_physical(map.m_tiles[tile_index(map, col, row)]);
 }
 
 void set_tile(DungeonMap& map, int col, int row, char symbol, bool blocks)
@@ -50,7 +154,45 @@ void set_tile(DungeonMap& map, int col, int row, char symbol, bool blocks)
 
     DungeonTile& tile = map.m_tiles[tile_index(map, col, row)];
     tile.m_symbol = symbol;
-    tile.m_blocks_movement = blocks;
+    tile.m_collision_mask = blocks ? k_tile_collision_solid : k_tile_collision_none;
+}
+
+void add_entity_placement(
+    DungeonMap& map,
+    DungeonMap::EntityKind kind,
+    int col,
+    int row,
+    char debug_symbol,
+    uint32_t collision_mask,
+    bool movable)
+{
+    if (!is_in_bounds(map, col, row))
+    {
+        return;
+    }
+
+    map.m_entity_placements.push_back(DungeonMap::EntityPlacement{
+        .m_kind = kind,
+        .m_col = col,
+        .m_row = row,
+        .m_debug_symbol = debug_symbol,
+        .m_collision_mask = collision_mask,
+        .m_movable = movable,
+    });
+}
+
+bool has_entity_placement_at(
+    const DungeonMap& map,
+    DungeonMap::EntityKind kind,
+    int col,
+    int row)
+{
+    return std::any_of(
+        map.m_entity_placements.begin(),
+        map.m_entity_placements.end(),
+        [kind, col, row](const DungeonMap::EntityPlacement& entity) {
+            return entity.m_kind == kind && entity.m_col == col && entity.m_row == row;
+        });
 }
 
 struct RoomRect
@@ -165,7 +307,20 @@ bool can_place_prefab(const DungeonMap& map, const PrefabTemplate& prefab, int o
 
             const DungeonTile& tile = map.m_tiles[tile_index(map, col, row)];
             // Only place on existing walkable carved space and never overwrite constraint markers.
-            if (tile.m_blocks_movement || tile.m_symbol == 'D' || tile.m_symbol == 'K' || tile.m_symbol == 'S')
+            if (dungeon_tile_blocks_physical(tile)
+                || tile.m_symbol == 'D'
+                || tile.m_symbol == 'K'
+                || tile.m_symbol == 'S')
+            {
+                return false;
+            }
+
+            if (std::any_of(
+                    map.m_entity_placements.begin(),
+                    map.m_entity_placements.end(),
+                    [col, row](const DungeonMap::EntityPlacement& entity) {
+                        return entity.m_col == col && entity.m_row == row;
+                    }))
             {
                 return false;
             }
@@ -187,7 +342,15 @@ void apply_prefab(DungeonMap& map, const PrefabTemplate& prefab, int origin_col,
             const char sym = prefab.m_rows[static_cast<std::size_t>(r)][static_cast<std::size_t>(c)];
             if (sym == 'P')
             {
-                set_tile(map, origin_col + c, origin_row + r, 'P', false);
+                set_tile(map, origin_col + c, origin_row + r, '.', false);
+                add_entity_placement(
+                    map,
+                    DungeonMap::EntityKind::Prop,
+                    origin_col + c,
+                    origin_row + r,
+                    'P',
+                    k_tile_collision_none,
+                    false);
             }
             else
             {
@@ -330,8 +493,24 @@ void place_key_switch_door_constraint(
     const auto [key_col, key_row] = find_nearest_walkable(map, a_col, a_row, door_col, door_row);
     const auto [switch_col, switch_row] = find_nearest_walkable(map, b_col, b_row, door_col, door_row);
 
-    set_tile(map, key_col, key_row, 'K', false);
-    set_tile(map, switch_col, switch_row, 'S', false);
+    set_tile(map, key_col, key_row, '.', false);
+    set_tile(map, switch_col, switch_row, '.', false);
+    add_entity_placement(
+        map,
+        DungeonMap::EntityKind::Key,
+        key_col,
+        key_row,
+        'K',
+        k_tile_collision_none,
+        false);
+    add_entity_placement(
+        map,
+        DungeonMap::EntityKind::Switch,
+        switch_col,
+        switch_row,
+        'S',
+        k_tile_collision_none,
+        false);
 
     std::uniform_int_distribution<uint32_t> key_id_dist(1U, 0x00FFFFFFU);
     map.m_generated_constraints.push_back(DungeonMap::DoorConstraint{
@@ -353,7 +532,7 @@ struct FloodFillResult
 
 bool is_tile_passable_for_validation(const DungeonTile& tile, bool treat_doors_as_open)
 {
-    if (!tile.m_blocks_movement)
+    if (!dungeon_tile_blocks_physical(tile))
     {
         return true;
     }
@@ -364,7 +543,7 @@ int find_first_walkable_tile_index(const DungeonMap& map)
 {
     for (int i = 0; i < static_cast<int>(map.m_tiles.size()); ++i)
     {
-        if (!map.m_tiles[static_cast<std::size_t>(i)].m_blocks_movement)
+        if (!dungeon_tile_blocks_physical(map.m_tiles[static_cast<std::size_t>(i)]))
         {
             return i;
         }
@@ -392,7 +571,7 @@ FloodFillResult flood_fill_from_start(const DungeonMap& map, int start_index, bo
         open.pop();
 
         const DungeonTile& tile = map.m_tiles[static_cast<std::size_t>(idx)];
-        if (!tile.m_blocks_movement)
+        if (!dungeon_tile_blocks_physical(tile))
         {
             ++result.m_reachable_walkable;
         }
@@ -448,6 +627,7 @@ bool load_handcrafted_dungeon_map(const std::string& path, DungeonMap& out_map)
     }
 
     std::vector<std::string> rows{};
+    std::vector<std::string> entity_records{};
     std::string line{};
     while (std::getline(input, line))
     {
@@ -458,6 +638,12 @@ bool load_handcrafted_dungeon_map(const std::string& path, DungeonMap& out_map)
 
         if (line.empty() || line.front() == ';')
         {
+            continue;
+        }
+
+        if (line.rfind("@entity", 0) == 0)
+        {
+            entity_records.push_back(line);
             continue;
         }
 
@@ -486,6 +672,7 @@ bool load_handcrafted_dungeon_map(const std::string& path, DungeonMap& out_map)
     parsed.m_height = static_cast<int>(rows.size());
     parsed.m_tiles.reserve(
         static_cast<std::size_t>(parsed.m_width) * static_cast<std::size_t>(parsed.m_height));
+    parsed.m_entity_placements.clear();
 
     for (int row = 0; row < parsed.m_height; ++row)
     {
@@ -500,16 +687,38 @@ bool load_handcrafted_dungeon_map(const std::string& path, DungeonMap& out_map)
 
             if (!is_supported_tile(symbol))
             {
-                symbol = '.';
+                return false;
             }
 
             parsed.m_tiles.push_back(DungeonTile{
                 .m_col = col,
                 .m_row = row,
-                .m_blocks_movement = tile_blocks_movement(symbol),
+                .m_collision_mask = tile_collision_mask_for_symbol(symbol),
                 .m_symbol = symbol,
             });
         }
+    }
+
+    for (const std::string& record : entity_records)
+    {
+        DungeonMap::EntityPlacement entity{};
+        if (!parse_entity_record_line(record, entity) || !is_in_bounds(parsed, entity.m_col, entity.m_row))
+        {
+            return false;
+        }
+
+        if (has_entity_placement_at(parsed, entity.m_kind, entity.m_col, entity.m_row))
+        {
+            return false;
+        }
+
+        const DungeonTile& tile = parsed.m_tiles[tile_index(parsed, entity.m_col, entity.m_row)];
+        if (dungeon_tile_blocks_physical(tile))
+        {
+            return false;
+        }
+
+        parsed.m_entity_placements.push_back(entity);
     }
 
     parsed.m_generated_constraints.clear();
@@ -534,6 +743,7 @@ bool generate_room_corridor_dungeon_map(const DungeonGenerationConfig& config, D
     generated.m_height = config.m_height;
     generated.m_tiles.reserve(
         static_cast<std::size_t>(generated.m_width) * static_cast<std::size_t>(generated.m_height));
+    generated.m_entity_placements.clear();
 
     for (int row = 0; row < generated.m_height; ++row)
     {
@@ -542,7 +752,7 @@ bool generate_room_corridor_dungeon_map(const DungeonGenerationConfig& config, D
             generated.m_tiles.push_back(DungeonTile{
                 .m_col = col,
                 .m_row = row,
-                .m_blocks_movement = true,
+                .m_collision_mask = k_tile_collision_solid,
                 .m_symbol = '#',
             });
         }
@@ -653,7 +863,7 @@ bool validate_generated_dungeon_map(const DungeonMap& map, DungeonValidationRepo
     int walkable_count = 0;
     for (const DungeonTile& tile : map.m_tiles)
     {
-        if (!tile.m_blocks_movement)
+        if (!dungeon_tile_blocks_physical(tile))
         {
             ++walkable_count;
         }
@@ -701,17 +911,19 @@ bool validate_generated_dungeon_map(const DungeonMap& map, DungeonValidationRepo
             constraints_valid = false;
             add_issue(report, "constraint key id must be non-zero");
         }
-        if (door_tile.m_symbol != 'D' || !door_tile.m_blocks_movement)
+        if (door_tile.m_symbol != 'D' || !dungeon_tile_blocks_physical(door_tile))
         {
             constraints_valid = false;
             add_issue(report, "constraint door tile is not a locked door marker");
         }
-        if (key_tile.m_symbol != 'K' || key_tile.m_blocks_movement)
+        if (!has_entity_placement_at(map, DungeonMap::EntityKind::Key, c.m_key_col, c.m_key_row)
+            || dungeon_tile_blocks_physical(key_tile))
         {
             constraints_valid = false;
             add_issue(report, "constraint key tile is invalid");
         }
-        if (switch_tile.m_symbol != 'S' || switch_tile.m_blocks_movement)
+        if (!has_entity_placement_at(map, DungeonMap::EntityKind::Switch, c.m_switch_col, c.m_switch_row)
+            || dungeon_tile_blocks_physical(switch_tile))
         {
             constraints_valid = false;
             add_issue(report, "constraint switch tile is invalid");
@@ -730,6 +942,31 @@ bool validate_generated_dungeon_map(const DungeonMap& map, DungeonValidationRepo
     report.m_is_valid = report.m_is_solvable_with_unlocks && constraints_valid && report.m_issues.empty();
     out_report = std::move(report);
     return out_report.m_is_valid;
+}
+
+bool dungeon_tile_has_collision_bits(const DungeonTile& tile, uint32_t bits)
+{
+    return (tile.m_collision_mask & bits) == bits;
+}
+
+bool dungeon_tile_blocks_physical(const DungeonTile& tile)
+{
+    return dungeon_tile_has_collision_bits(tile, k_tile_collision_solid);
+}
+
+bool dungeon_tile_blocks_visual(const DungeonTile& tile)
+{
+    return tile_blocks_visual_symbol(tile.m_symbol);
+}
+
+bool dungeon_entity_has_collision_bits(const DungeonMap::EntityPlacement& entity, uint32_t bits)
+{
+    return (entity.m_collision_mask & bits) == bits;
+}
+
+bool dungeon_entity_blocks_physical(const DungeonMap::EntityPlacement& entity)
+{
+    return dungeon_entity_has_collision_bits(entity, k_tile_collision_solid);
 }
 
 } // namespace mordor

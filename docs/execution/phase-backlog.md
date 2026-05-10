@@ -85,14 +85,17 @@ Must be resolved before rotation is considered production-quality. Tracked for P
 | P5-09 | Move player/key/switch markers to separate scene nodes and keep static mesh marker-free | P5-08 | High | Complete | decisions/0007-static-mesh-and-dynamic-scene-nodes.md |
 | P5-10 | Route player movement collision through wall octree and generalize runtime visual nodes for future item/NPC rendering | P5-09 | High | Complete | decisions/0007-static-mesh-and-dynamic-scene-nodes.md |
 | P5-11 | Formalize dual-layer map semantics: visual-occlusion vs physical-blocking, with explicit node blocking flags | P5-10 | High | Complete | decisions/0008-visual-occlusion-vs-physical-blocking-layers.md |
+| P5-12 | Add authored visual-only wall data fields and illusory-wall acceptance coverage | P5-11 | High | Complete | decisions/0008-visual-occlusion-vs-physical-blocking-layers.md |
+| P5-13 | Switch map physical layer to collision bitmask fields and route occupancy/collision builds through bit checks | P5-12 | High | Complete | decisions/0008-visual-occlusion-vs-physical-blocking-layers.md |
+| P5-14 | Move map-authored non-mesh entities to a dedicated entity placement table and spawn runtime visuals from that table | P5-13 | High | Complete | architecture/world-scene-structure.md |
+| P5-15 | Add explicit solid/non-solid and movable/non-movable flags to entity placements | P5-14 | High | Complete | decisions/0008-visual-occlusion-vs-physical-blocking-layers.md |
+| P5-16 | Merge non-movable solid entities into static occupancy/wall-collision data while keeping movable solids dynamic | P5-15 | High | Complete | architecture/world-scene-structure.md |
+| P5-17 | Enforce strict table-based handcrafted entity authoring and reject legacy in-grid entity symbols | P5-16 | High | Complete | architecture/world-scene-structure.md |
 
 ### Known Limitations — Post P5
 
-1. Wall geometry is emitted per blocked tile and still includes interior side faces between adjacent wall tiles; this increases polygon count and can surface as visual artifacts when occlusion fading is active.
-2. Occlusion fade reference is not yet aligned to a clearly exposed party/actor position contract, making behavior appear camera-driven in quick playtests.
-3. Target occlusion intent: fade only geometry between camera and active actor/party anchor; never fade geometry behind the anchor unless another gameplay visibility system requires it.
-4. Occlusion must be radius-gated so walls outside the effective blocking radius are ignored; expected steady-state is typically one to two faded wall segments except at low camera pitch foreground stacks.
-5. Resolve all items before treating rendering readability/performance as production-ready for larger maps.
+1. Previously listed Post-P5 rendering limitations were addressed by P5-06, P5-07, and subsequent P5-13 through P5-17 layering/collision improvements.
+2. Remaining rendering and readability improvements are tracked in [docs/execution/next-steps.md](next-steps.md).
 
 ## Phase 6 Backlog
 
