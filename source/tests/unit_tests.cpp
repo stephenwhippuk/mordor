@@ -246,6 +246,10 @@ void test_generated_constraint_runtime_binding_rules()
             dynamic_next_id),
         "runtime models should build after generated door collision override");
 
+    check(
+        dynamic_bindings.size() >= 1U,
+        "runtime models should emit at least one binding for the generated constraint");
+
     std::vector<TransformComponent> dynamic_transforms{};
     dynamic_transforms.push_back(TransformComponent{
         .m_entity_id = dynamic_bindings[0].m_door_entity_id,

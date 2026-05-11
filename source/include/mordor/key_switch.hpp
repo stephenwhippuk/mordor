@@ -1,12 +1,13 @@
 #pragma once
 
-#include "mordor/map.hpp"
 #include "mordor/interactions.hpp"
 
 #include <cstdint>
 #include <vector>
 
 namespace mordor {
+
+struct DungeonMap;
 
 using KeyId = uint32_t;
 

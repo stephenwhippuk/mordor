@@ -295,6 +295,7 @@ uint32_t prefab_anchor_flags()
 {
     return scene_node_category_bits(SceneNodeCategory::DynamicAttachment)
         | scene_node_category_bits(SceneNodeCategory::InteractableAnchor)
+        | scene_node_category_bits(SceneNodeCategory::Renderable)
         | scene_node_category_bits(SceneNodeCategory::Pickable)
         | scene_node_category_bits(SceneNodeCategory::DebugOnly);
 }
@@ -545,12 +546,16 @@ bool append_prefab_runtime_anchor_nodes(
             .m_z = 0.0F,
         };
 
-        const SceneNodeId node_id = add_runtime_visual_node(
+        const SceneNodeId node_id = add_scene_node(
             scene,
-            'F',
-            anchor_world,
-            prefab_anchor_flags(),
-            static_cast<int>(i));
+            SceneNodeCreateInfo{
+                .m_parent_id = scene.m_root_node_id,
+                .m_local_position = anchor_world,
+                .m_local_bounds = marker_local_bounds(),
+                .m_category_flags = prefab_anchor_flags(),
+                .m_payload_index = static_cast<int>(i),
+                .m_debug_symbol = 'F',
+            });
         if (node_id == k_invalid_scene_node_id)
         {
             return false;

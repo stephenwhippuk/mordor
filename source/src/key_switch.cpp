@@ -1,5 +1,7 @@
 #include "mordor/key_switch.hpp"
 
+#include "mordor/map.hpp"
+
 #include <algorithm>
 
 namespace mordor {
