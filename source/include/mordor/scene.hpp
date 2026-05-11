@@ -95,6 +95,10 @@ struct SceneDebugMetrics
 };
 
 bool build_scene_from_dungeon_map(const DungeonMap& map, Scene& out_scene);
+bool append_prefab_runtime_anchor_nodes(
+    Scene& scene,
+    const DungeonMap& map,
+    std::vector<SceneNodeId>& out_node_ids);
 SceneNodeId add_runtime_visual_node(
     Scene& scene,
     char symbol,

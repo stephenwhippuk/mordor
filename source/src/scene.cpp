@@ -291,6 +291,15 @@ uint32_t marker_flags_for_entity(const DungeonMap::EntityPlacement& entity)
     return flags;
 }
 
+uint32_t prefab_anchor_flags()
+{
+    return scene_node_category_bits(SceneNodeCategory::DynamicAttachment)
+        | scene_node_category_bits(SceneNodeCategory::InteractableAnchor)
+        | scene_node_category_bits(SceneNodeCategory::Renderable)
+        | scene_node_category_bits(SceneNodeCategory::Pickable)
+        | scene_node_category_bits(SceneNodeCategory::DebugOnly);
+}
+
 void update_scene_node_bounds_recursive(Scene& scene, SceneNodeId node_id)
 {
     if (node_id == k_invalid_scene_node_id)
@@ -345,6 +354,11 @@ std::size_t chunk_index(int chunk_col, int chunk_row, int chunk_columns)
 }
 
 } // namespace
+
+bool append_prefab_runtime_anchor_nodes(
+    Scene& scene,
+    const DungeonMap& map,
+    std::vector<SceneNodeId>& out_node_ids);
 
 bool build_scene_from_dungeon_map(const DungeonMap& map, Scene& out_scene)
 {
@@ -484,9 +498,72 @@ bool build_scene_from_dungeon_map(const DungeonMap& map, Scene& out_scene)
         }
     }
 
+    std::vector<SceneNodeId> prefab_anchor_node_ids{};
+    if (!append_prefab_runtime_anchor_nodes(scene, map, prefab_anchor_node_ids))
+    {
+        return false;
+    }
+
     rebuild_scene_spatial_index(scene, root_bounds);
 
     out_scene = std::move(scene);
+    return true;
+}
+
+bool append_prefab_runtime_anchor_nodes(
+    Scene& scene,
+    const DungeonMap& map,
+    std::vector<SceneNodeId>& out_node_ids)
+{
+    if (map.m_width <= 0 || map.m_height <= 0)
+    {
+        return false;
+    }
+
+    for (std::size_t i = 0; i < map.m_prefab_placements.size(); ++i)
+    {
+        const DungeonMap::PrefabPlacement& prefab = map.m_prefab_placements[i];
+        if (prefab.m_prefab_id == 0U || prefab.m_width <= 0 || prefab.m_height <= 0)
+        {
+            return false;
+        }
+
+        const int max_col = prefab.m_origin_col + prefab.m_width;
+        const int max_row = prefab.m_origin_row + prefab.m_height;
+        if (prefab.m_origin_col < 0
+            || prefab.m_origin_row < 0
+            || max_col > map.m_width
+            || max_row > map.m_height)
+        {
+            return false;
+        }
+
+        const Float3 anchor_world{
+            .m_x = (static_cast<float>(prefab.m_origin_col) + (static_cast<float>(prefab.m_width) * 0.5F))
+                 * k_scene_tile_world_size,
+            .m_y = (static_cast<float>(prefab.m_origin_row) + (static_cast<float>(prefab.m_height) * 0.5F))
+                 * k_scene_tile_world_size,
+            .m_z = 0.0F,
+        };
+
+        const SceneNodeId node_id = add_scene_node(
+            scene,
+            SceneNodeCreateInfo{
+                .m_parent_id = scene.m_root_node_id,
+                .m_local_position = anchor_world,
+                .m_local_bounds = marker_local_bounds(),
+                .m_category_flags = prefab_anchor_flags(),
+                .m_payload_index = static_cast<int>(i),
+                .m_debug_symbol = 'F',
+            });
+        if (node_id == k_invalid_scene_node_id)
+        {
+            return false;
+        }
+
+        out_node_ids.push_back(node_id);
+    }
+
     return true;
 }
 

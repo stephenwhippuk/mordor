@@ -12,6 +12,7 @@
 #include "mordor/inventory_pipeline.hpp"
 #include "mordor/perception_debug.hpp"
 #include "mordor/party_commands.hpp"
+#include "mordor/key_switch.hpp"
 #include "mordor/scene.hpp"
 #include "mordor/visibility.hpp"
 
@@ -303,6 +304,32 @@ mordor::Float3 tile_center_world(mordor::TileCoord tile)
     };
 }
 
+void append_generated_constraint_transforms(
+    const std::vector<mordor::GeneratedConstraintBinding>& bindings,
+    std::vector<mordor::TransformComponent>& out_transforms)
+{
+    out_transforms.reserve(out_transforms.size() + (bindings.size() * 2U));
+    for (const mordor::GeneratedConstraintBinding& binding : bindings)
+    {
+        out_transforms.push_back(mordor::TransformComponent{
+            .m_entity_id = binding.m_door_entity_id,
+            .m_scene_node_id = mordor::k_invalid_scene_node_id,
+            .m_local_offset = tile_center_world(mordor::TileCoord{
+                .m_col = binding.m_door_col,
+                .m_row = binding.m_door_row,
+            }),
+        });
+        out_transforms.push_back(mordor::TransformComponent{
+            .m_entity_id = binding.m_switch_entity_id,
+            .m_scene_node_id = mordor::k_invalid_scene_node_id,
+            .m_local_offset = tile_center_world(mordor::TileCoord{
+                .m_col = binding.m_switch_col,
+                .m_row = binding.m_switch_row,
+            }),
+        });
+    }
+}
+
 mordor::Float3 camera_eye_world(const mordor::CameraState& camera)
 {
     const float yaw = camera.m_rotation_radians;
@@ -468,6 +495,14 @@ int main(int argc, char** argv)
             handcrafted_map.m_height);
     }
 
+    if (!mordor::apply_generated_constraint_door_collision_overrides(handcrafted_map))
+    {
+        MORDOR_LOG_CRITICAL("Failed to apply generated door collision overrides");
+        renderer.shutdown();
+        mordor::log::shutdown();
+        return 1;
+    }
+
     int player_col = -1;
     int player_row = -1;
     if (mark_player_spawn_tile(handcrafted_map, player_col, player_row))
@@ -498,6 +533,19 @@ int main(int argc, char** argv)
         world_scene.m_nodes.size(),
         world_scene.m_spatial_index.m_indexed_node_count,
         world_scene.m_spatial_index.m_cells.size());
+
+    std::size_t prefab_anchor_count = 0U;
+    for (const mordor::SceneNode& node : world_scene.m_nodes)
+    {
+        if (node.m_debug_symbol == 'F')
+        {
+            ++prefab_anchor_count;
+        }
+    }
+    MORDOR_LOG_INFO(
+        "Runtime prefab anchor nodes={} generated_prefab_metadata={}",
+        prefab_anchor_count,
+        handcrafted_map.m_prefab_placements.size());
 
     const mordor::Float3 initial_player_world = tile_center_world(active_player_tile);
     const mordor::SceneNodeId player_marker_node_id =
@@ -542,6 +590,35 @@ int main(int argc, char** argv)
         mordor::log::shutdown();
         return 1;
     }
+
+    std::vector<mordor::GeneratedConstraintBinding> generated_constraint_bindings{};
+    std::vector<mordor::InteractableComponent> generated_interactables{};
+    std::vector<mordor::SwitchLinkModel> generated_switch_links{};
+    std::vector<mordor::TransformComponent> generated_interactable_transforms{};
+    mordor::EntityId next_generated_entity_id = mordor::k_invalid_entity_id;
+    constexpr mordor::EntityId k_generated_entity_id_base = 10000U;
+    if (!mordor::append_generated_constraint_runtime_models(
+            handcrafted_map,
+            k_generated_entity_id_base,
+            generated_constraint_bindings,
+            generated_interactables,
+            generated_switch_links,
+            next_generated_entity_id))
+    {
+        MORDOR_LOG_CRITICAL("Failed to build generated constraint runtime bindings");
+        renderer.shutdown();
+        mordor::log::shutdown();
+        return 1;
+    }
+    MORDOR_LOG_INFO(
+        "Generated runtime constraint bindings={} interactables={} switch_links={} next_entity_id={}",
+        generated_constraint_bindings.size(),
+        generated_interactables.size(),
+        generated_switch_links.size(),
+        next_generated_entity_id);
+    append_generated_constraint_transforms(
+        generated_constraint_bindings,
+        generated_interactable_transforms);
 
     mordor::WallCollisionOctree wall_collision_octree{};
     if (mordor::build_wall_collision_octree(handcrafted_map, wall_collision_octree))
@@ -637,11 +714,19 @@ int main(int argc, char** argv)
          &party_queue,
          &ability_queue,
          &item_use_queue,
-         &demo_inventory_items](double dt) {
+         &demo_inventory_items,
+         &generated_interactables,
+         &generated_interactable_transforms](double dt) {
         MORDOR_PROFILE_SCOPE("simulate");
         ++world.m_tick_count;
 
         renderer.update_camera_controls(dt);
+
+        mordor::clear_dynamic_occupancy(occupancy_grid);
+        (void)mordor::apply_interactable_blocking_to_grid(
+            occupancy_grid,
+            generated_interactables,
+            generated_interactable_transforms);
 
         world.m_player_move_cooldown_seconds = std::max(0.0, world.m_player_move_cooldown_seconds - dt);
 

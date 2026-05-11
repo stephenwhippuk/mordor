@@ -128,6 +128,148 @@ void test_key_and_switch_logic()
     check(interactables[0].m_state == InteractableState::Open, "linked target should open");
 }
 
+void test_generated_constraint_runtime_binding_rules()
+{
+    DungeonMap map = build_test_map();
+    map.m_generated_constraints.push_back(DungeonMap::DoorConstraint{
+        .m_key_id = 9001U,
+        .m_door_col = 1,
+        .m_door_row = 0,
+        .m_key_col = 0,
+        .m_key_row = 1,
+        .m_switch_col = 2,
+        .m_switch_row = 1,
+    });
+
+    std::vector<GeneratedConstraintBinding> bindings{};
+    std::vector<InteractableComponent> interactables{};
+    std::vector<SwitchLinkModel> switch_links{};
+    EntityId next_entity_id = k_invalid_entity_id;
+
+    check(
+        append_generated_constraint_runtime_models(
+            map,
+            10000U,
+            bindings,
+            interactables,
+            switch_links,
+            next_entity_id),
+        "generated constraint runtime model build should succeed");
+    check(bindings.size() == 1U, "generated constraint runtime model should emit one binding");
+    check(interactables.size() == 2U, "generated constraint runtime model should emit door and switch interactables");
+    check(switch_links.size() == 1U, "generated constraint runtime model should emit one switch link");
+    check(next_entity_id == 10002U, "generated constraint runtime model should advance entity id cursor");
+
+    InteractableComponent* door = nullptr;
+    InteractableComponent* sw = nullptr;
+    for (InteractableComponent& component : interactables)
+    {
+        if (component.m_kind == InteractableKind::Door)
+        {
+            door = &component;
+        }
+        else if (component.m_kind == InteractableKind::Switch)
+        {
+            sw = &component;
+        }
+    }
+
+    check(door != nullptr, "generated constraint runtime model should include a door interactable");
+    check(sw != nullptr, "generated constraint runtime model should include a switch interactable");
+    if (door == nullptr || sw == nullptr)
+    {
+        return;
+    }
+
+    check(door->m_state == InteractableState::Locked, "generated door should start locked");
+    check(door->m_required_key_id == 9001U, "generated door should carry required key id");
+
+    KeyRingComponent keyring{};
+    keyring.m_actor_entity_id = 77U;
+    check(!try_unlock_interactable(keyring, *door), "generated door should not unlock before key is granted");
+    check(grant_key_to_actor(keyring, 9001U), "generated key id should be grantable to keyring");
+    check(try_unlock_interactable(keyring, *door), "generated door should unlock once required key is granted");
+    check(door->m_state == InteractableState::Closed, "generated door should be closed after key-based unlock");
+
+    // Relock door and verify switch link unlock path from generated switch bindings.
+    check(apply_interaction_event(*door, InteractionEvent::Lock), "generated door should be lockable for switch-link test");
+    check(toggle_switch_and_apply_links(*sw, switch_links, interactables), "generated switch link should toggle and apply");
+    check(door->m_state == InteractableState::Closed, "generated switch link should unlock door to closed state");
+
+    DungeonMap map_for_collision_override = build_test_map();
+    map_for_collision_override.m_width = 3;
+    map_for_collision_override.m_height = 2;
+    map_for_collision_override.m_tiles = {
+        DungeonTile{.m_col = 0, .m_row = 0, .m_collision_mask = k_tile_collision_none, .m_symbol = '.'},
+        DungeonTile{.m_col = 1, .m_row = 0, .m_collision_mask = k_tile_collision_solid, .m_symbol = 'D'},
+        DungeonTile{.m_col = 2, .m_row = 0, .m_collision_mask = k_tile_collision_none, .m_symbol = '.'},
+        DungeonTile{.m_col = 0, .m_row = 1, .m_collision_mask = k_tile_collision_none, .m_symbol = '.'},
+        DungeonTile{.m_col = 1, .m_row = 1, .m_collision_mask = k_tile_collision_none, .m_symbol = '.'},
+        DungeonTile{.m_col = 2, .m_row = 1, .m_collision_mask = k_tile_collision_none, .m_symbol = '.'},
+    };
+    map_for_collision_override.m_generated_constraints.push_back(DungeonMap::DoorConstraint{
+        .m_key_id = 700U,
+        .m_door_col = 1,
+        .m_door_row = 0,
+        .m_key_col = 0,
+        .m_key_row = 1,
+        .m_switch_col = 2,
+        .m_switch_row = 1,
+    });
+
+    check(
+        apply_generated_constraint_door_collision_overrides(map_for_collision_override),
+        "generated door collision override should succeed");
+    check(
+        !dungeon_tile_blocks_physical(map_for_collision_override.m_tiles[1]),
+        "generated door tile should no longer be statically blocking after override");
+
+    OccupancyGrid collision_grid{};
+    check(
+        build_occupancy_grid_from_map(map_for_collision_override, collision_grid),
+        "occupancy build should succeed after generated door collision override");
+    check(
+        !is_tile_blocked(collision_grid, 1, 0),
+        "generated door tile should not be statically blocked in occupancy after override");
+
+    std::vector<GeneratedConstraintBinding> dynamic_bindings{};
+    std::vector<InteractableComponent> dynamic_interactables{};
+    std::vector<SwitchLinkModel> dynamic_switch_links{};
+    EntityId dynamic_next_id = k_invalid_entity_id;
+    check(
+        append_generated_constraint_runtime_models(
+            map_for_collision_override,
+            20000U,
+            dynamic_bindings,
+            dynamic_interactables,
+            dynamic_switch_links,
+            dynamic_next_id),
+        "runtime models should build after generated door collision override");
+
+    check(
+        dynamic_bindings.size() >= 1U,
+        "runtime models should emit at least one binding for the generated constraint");
+
+    std::vector<TransformComponent> dynamic_transforms{};
+    dynamic_transforms.push_back(TransformComponent{
+        .m_entity_id = dynamic_bindings[0].m_door_entity_id,
+        .m_scene_node_id = k_invalid_scene_node_id,
+        .m_local_offset = Float3{.m_x = 1.5F * k_scene_tile_world_size, .m_y = 0.5F * k_scene_tile_world_size, .m_z = 0.0F},
+    });
+    dynamic_transforms.push_back(TransformComponent{
+        .m_entity_id = dynamic_bindings[0].m_switch_entity_id,
+        .m_scene_node_id = k_invalid_scene_node_id,
+        .m_local_offset = Float3{.m_x = 2.5F * k_scene_tile_world_size, .m_y = 1.5F * k_scene_tile_world_size, .m_z = 0.0F},
+    });
+
+    check(
+        apply_interactable_blocking_to_grid(collision_grid, dynamic_interactables, dynamic_transforms),
+        "dynamic interactable blocking should apply for generated door runtime model");
+    check(
+        is_tile_blocked(collision_grid, 1, 0),
+        "generated door tile should be dynamically blocked while door is locked/closed");
+}
+
 void test_occupancy_rules()
 {
     const DungeonMap map = build_test_map();
@@ -1230,6 +1372,71 @@ void test_world_mesh_generation_rules()
     check(
         symbol_mesh_again.m_indices == symbol_mesh.m_indices,
         "symbol mesh build should be deterministic for index ordering");
+
+    DungeonMap prefab_anchor_map = build_test_map();
+    prefab_anchor_map.m_prefab_placements.push_back(DungeonMap::PrefabPlacement{
+        .m_prefab_id = 2U,
+        .m_origin_col = 0,
+        .m_origin_row = 0,
+        .m_width = 2,
+        .m_height = 2,
+    });
+    prefab_anchor_map.m_prefab_placements.push_back(DungeonMap::PrefabPlacement{
+        .m_prefab_id = 3U,
+        .m_origin_col = 1,
+        .m_origin_row = 0,
+        .m_width = 2,
+        .m_height = 1,
+    });
+
+    Scene prefab_anchor_scene{};
+    check(
+        build_scene_from_dungeon_map(prefab_anchor_map, prefab_anchor_scene),
+        "scene build should consume prefab placement metadata into runtime anchor nodes");
+
+    std::vector<const SceneNode*> prefab_anchor_nodes{};
+    for (const SceneNode& node : prefab_anchor_scene.m_nodes)
+    {
+        if (node.m_debug_symbol == 'F')
+        {
+            prefab_anchor_nodes.push_back(&node);
+        }
+    }
+
+    check(
+        prefab_anchor_nodes.size() == prefab_anchor_map.m_prefab_placements.size(),
+        "scene build should emit one prefab anchor node for each prefab placement");
+    if (prefab_anchor_nodes.size() == prefab_anchor_map.m_prefab_placements.size())
+    {
+        for (std::size_t i = 0; i < prefab_anchor_nodes.size(); ++i)
+        {
+            const SceneNode* anchor = prefab_anchor_nodes[i];
+            const DungeonMap::PrefabPlacement& placement = prefab_anchor_map.m_prefab_placements[i];
+            check(anchor != nullptr, "prefab anchor scene node pointer should be valid");
+            if (anchor == nullptr)
+            {
+                continue;
+            }
+
+            check(anchor->m_payload_index == static_cast<int>(i), "prefab anchor should carry prefab placement index payload");
+            check(
+                scene_node_has_flags(*anchor, scene_node_category_bits(SceneNodeCategory::InteractableAnchor)),
+                "prefab anchor should be tagged as interactable anchor category");
+            check(
+                scene_node_has_flags(*anchor, scene_node_category_bits(SceneNodeCategory::DebugOnly)),
+                "prefab anchor should be tagged as debug-only category");
+
+            const float expected_x = (static_cast<float>(placement.m_origin_col)
+                + (static_cast<float>(placement.m_width) * 0.5F))
+                * k_scene_tile_world_size;
+            const float expected_y = (static_cast<float>(placement.m_origin_row)
+                + (static_cast<float>(placement.m_height) * 0.5F))
+                * k_scene_tile_world_size;
+
+            check_near(expected_x, anchor->m_world_position.m_x, 0.0001F, "prefab anchor x should map to prefab placement center");
+            check_near(expected_y, anchor->m_world_position.m_y, 0.0001F, "prefab anchor y should map to prefab placement center");
+        }
+    }
 }
 
 void test_wall_collision_octree_overlap_rules()
@@ -1900,6 +2107,7 @@ int main()
     {
         test_interaction_state_machines();
         test_key_and_switch_logic();
+        test_generated_constraint_runtime_binding_rules();
         test_occupancy_rules();
         test_line_of_sight_rules();
         test_directional_hearing_rules();

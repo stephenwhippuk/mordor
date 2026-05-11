@@ -78,6 +78,7 @@ Current baseline:
 22. Non-mesh entities are now represented in a map-associated entity placement table instead of tile symbol codes; scene runtime markers are emitted from that table.
 23. Entity placements now encode `solid` and `movable` semantics: non-movable solid entities merge into static occupancy/wall-collision data, while movable solid entities remain dynamic scene blockers.
 24. Handcrafted map loading enforces strict entity-table authoring for non-mesh entities and rejects legacy in-grid entity symbols.
+25. Generated prefab placement metadata is now consumed during scene build as runtime prefab anchor nodes (payload-linked to prefab placement records) for follow-on item/NPC spawning.
 
 Ordering note:
 1. Ship stable world rendering before advanced visual effects.
@@ -115,6 +116,8 @@ Current baseline:
 13. Generator constraints baseline now places deterministic key/switch/door triplets: locked doors are embedded on generated traversal routes with paired key and switch placements emitted as map metadata for follow-on gameplay binding.
 14. Prefab insertion baseline is implemented as deterministic set-piece stamping over carved rooms, with placement metadata emitted for authored scene binding and follow-on runtime integration.
 15. Generation validation baseline verifies reachability/solvability with actionable diagnostics: walkable connectivity is checked with and without door unlock assumptions, and generated key/switch/door constraints are structurally validated before maps are considered valid.
+16. Runtime bootstrap now converts generated key/switch/door constraints into interactable components and deterministic switch-link models so generated door state transitions participate in the same gameplay rules path as handcrafted interactions.
+17. Runtime scene construction now converts generated prefab placement metadata into deterministic runtime anchor nodes so spawned gameplay entities can bind to authored prefab regions.
 
 Ordering note:
 1. Deterministic behavior is a hard requirement for reliable testing.
@@ -132,6 +135,7 @@ Current baseline:
 3. Party selection and command issuing now flow through an abstract, deterministic command-intent layer, leaving game-specific resolution details for later phases.
 4. Ability requests now pass through an abstract validation-and-queue pipeline with explicit target-kind rules (none/entity/tile), action-point gating, and range checks.
 5. Inventory item-use requests now pass through an abstract validation-and-queue pipeline with explicit target-kind rules (none/entity/tile), ownership checks, and deterministic range validation for map-targeted usage.
+6. Generated lock/switch constraints now bind into runtime door/switch interactables and can transition through unlock/open/close states through the shared interaction and key/switch rule helpers.
 
 Ordering note:
 1. Stabilize rule contracts early to reduce UI and AI churn.

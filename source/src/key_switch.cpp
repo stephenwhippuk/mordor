@@ -1,10 +1,17 @@
 #include "mordor/key_switch.hpp"
 
+#include "mordor/map.hpp"
+
 #include <algorithm>
 
 namespace mordor {
 
 namespace {
+
+bool tile_in_bounds(const DungeonMap& map, int col, int row)
+{
+    return col >= 0 && row >= 0 && col < map.m_width && row < map.m_height;
+}
 
 InteractableComponent* find_interactable_by_entity(
     std::vector<InteractableComponent>& interactables,
@@ -111,6 +118,99 @@ bool toggle_switch_and_apply_links(
     }
 
     (void)apply_switch_links_for_state(switch_component, switch_links, interactables);
+    return true;
+}
+
+bool append_generated_constraint_runtime_models(
+    const DungeonMap& map,
+    EntityId entity_id_base,
+    std::vector<GeneratedConstraintBinding>& out_bindings,
+    std::vector<InteractableComponent>& out_interactables,
+    std::vector<SwitchLinkModel>& out_switch_links,
+    EntityId& out_next_entity_id)
+{
+    if (entity_id_base == k_invalid_entity_id)
+    {
+        return false;
+    }
+
+    EntityId next_entity_id = entity_id_base;
+
+    for (const DungeonMap::DoorConstraint& constraint : map.m_generated_constraints)
+    {
+        if (constraint.m_key_id == 0U
+            || !tile_in_bounds(map, constraint.m_door_col, constraint.m_door_row)
+            || !tile_in_bounds(map, constraint.m_key_col, constraint.m_key_row)
+            || !tile_in_bounds(map, constraint.m_switch_col, constraint.m_switch_row))
+        {
+            return false;
+        }
+
+        const EntityId door_entity_id = next_entity_id++;
+        const EntityId switch_entity_id = next_entity_id++;
+
+        out_interactables.push_back(InteractableComponent{
+            .m_entity_id = door_entity_id,
+            .m_kind = InteractableKind::Door,
+            .m_state = InteractableState::Locked,
+            .m_state_machine_id = 0U,
+            .m_required_key_id = constraint.m_key_id,
+            .m_blocks_movement_when_active = true,
+        });
+
+        out_interactables.push_back(InteractableComponent{
+            .m_entity_id = switch_entity_id,
+            .m_kind = InteractableKind::Switch,
+            .m_state = InteractableState::Closed,
+            .m_state_machine_id = 0U,
+            .m_required_key_id = 0U,
+            .m_blocks_movement_when_active = false,
+        });
+
+        out_switch_links.push_back(SwitchLinkModel{
+            .m_switch_entity_id = switch_entity_id,
+            .m_target_entity_id = door_entity_id,
+            .m_on_activate_event = InteractionEvent::Unlock,
+            .m_on_deactivate_event = InteractionEvent::Close,
+        });
+
+        out_bindings.push_back(GeneratedConstraintBinding{
+            .m_key_id = constraint.m_key_id,
+            .m_door_col = constraint.m_door_col,
+            .m_door_row = constraint.m_door_row,
+            .m_key_col = constraint.m_key_col,
+            .m_key_row = constraint.m_key_row,
+            .m_switch_col = constraint.m_switch_col,
+            .m_switch_row = constraint.m_switch_row,
+            .m_door_entity_id = door_entity_id,
+            .m_switch_entity_id = switch_entity_id,
+        });
+    }
+
+    out_next_entity_id = next_entity_id;
+    return true;
+}
+
+bool apply_generated_constraint_door_collision_overrides(DungeonMap& map)
+{
+    for (const DungeonMap::DoorConstraint& constraint : map.m_generated_constraints)
+    {
+        if (!tile_in_bounds(map, constraint.m_door_col, constraint.m_door_row))
+        {
+            return false;
+        }
+
+        const std::size_t tile_idx = static_cast<std::size_t>(
+            constraint.m_door_row * map.m_width + constraint.m_door_col);
+        if (tile_idx >= map.m_tiles.size())
+        {
+            return false;
+        }
+
+        DungeonTile& tile = map.m_tiles[tile_idx];
+        tile.m_collision_mask &= ~k_tile_collision_solid;
+    }
+
     return true;
 }
 
