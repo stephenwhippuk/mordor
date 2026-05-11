@@ -4,12 +4,12 @@
 Integrate generated dungeon outputs into runtime systems and begin Phase 7 AI/content expansion groundwork.
 
 ## Work Items
-1. Extend generated key/switch/door runtime handling from visualization into interactable gameplay placement/state transitions.
-2. Bind generated prefab placement metadata into runtime scene/entity spawning.
+1. Extend generated key/switch/door runtime handling from visualization into interactable gameplay placement/state transitions. (Complete)
+2. Bind generated prefab placement metadata into runtime scene/entity spawning. (Complete)
 3. Define and implement initial scripted NPC behavior interface (P7-01).
 
 ## Success Criteria
-1. Generated map metadata (constraints + prefab placements) is consumed by runtime scene/interactable spawn paths.
+1. Generated map metadata (constraints + prefab placements) is consumed by runtime scene/interactable spawn paths. (Complete)
 2. Runtime can boot from generated map path with deterministic outputs for fixed seed. (Complete)
 3. Scripted NPC behavior interface is in place with stable contracts for follow-on behavior tasks.
 4. Existing simulation and rendering baselines remain green while integration and AI scaffolding land.

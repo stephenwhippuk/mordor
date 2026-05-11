@@ -37,6 +37,8 @@ Authoring contract:
 3. Entity placements carry explicit collision bits (`solid` currently) plus a `movable` flag.
 4. Non-movable solid entity placements merge into static occupancy and wall-collision build data; movable solid entities remain dynamic blockers.
 5. Handcrafted map loading uses strict table-based non-mesh entity authoring (`@entity ...` records) and does not accept legacy entity tile symbols.
+6. Generated key/switch/door constraints are treated as authored metadata and are bound during runtime bootstrap into interactable door/switch records plus switch-link model edges.
+7. Generated prefab placement metadata is bound during scene construction into runtime prefab anchor nodes with payload links to source placement records.
 
 Handcrafted entity record format:
 1. Record syntax: `@entity <kind> <col> <row> <symbol> <solid> <movable>`

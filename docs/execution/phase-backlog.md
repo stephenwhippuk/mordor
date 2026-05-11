@@ -105,6 +105,8 @@ Must be resolved before rotation is considered production-quality. Tracked for P
 | P6-02 | Add key-lock and switch-door generator constraints | P6-01 | High | Complete | research/research-tracks.md |
 | P6-03 | Add prefab insertion support for complex scenes | P6-01 | Medium | Complete | research/research-tracks.md |
 | P6-04 | Build validation pass for reachability and solvability | P6-01, P6-02 | High | Complete | quality/testing-strategy.md |
+| P6-05 | Bind generated key/switch/door constraints into runtime interactable state and switch-link models | P6-02, P5-17 | High | Complete | execution/next-steps.md |
+| P6-06 | Bind generated prefab placement metadata into runtime prefab anchor scene nodes for follow-on entity spawning | P6-03, P5-14 | High | Complete | execution/next-steps.md |
 
 ## Phase 7 Backlog
 
